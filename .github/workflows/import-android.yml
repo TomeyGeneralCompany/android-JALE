@@ -77,5 +77,6 @@ jobs:
             echo 'Already imported'
           else
             git commit -m 'Clone El Grande archive and add independent Android app'
-            git push
+            git pull --rebase origin main
+            git push origin HEAD:main
           fi
