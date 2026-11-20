@@ -48,6 +48,9 @@ android {
 chaquopy {
     defaultConfig {
         version = '3.12'
+        pip {
+            install 'tzdata==2026.2'
+        }
     }
     sourceSets {
         main {
