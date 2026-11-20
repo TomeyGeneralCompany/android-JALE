@@ -1,4 +1,4 @@
-name: Publish signed El Grande Android APK
+name: Publish signed JALE Android APK
 
 on:
   push:
@@ -8,7 +8,10 @@ permissions:
   contents: write
 
 jobs:
+  verify:
+    uses: ./.github/workflows/android-device-smoke.yml
   publish:
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -53,4 +56,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" android/app/build/outputs/apk/release/app-release.apk#el-grande-android.apk --title "El Grande Android $GITHUB_REF_NAME" --notes "Standalone Android APK with local El Grande records."
+          gh release create "$GITHUB_REF_NAME" android/app/build/outputs/apk/release/app-release.apk#jale-android.apk --title "JALE Android $GITHUB_REF_NAME" --notes "Signed standalone Android JALE app with local records."
