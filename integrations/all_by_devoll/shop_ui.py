@@ -250,7 +250,7 @@ def ticket_page(ticket, con, amounts, estimate_running=False):
 def page_shell(content):
     html_top='''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#e09915"><title>El Grande | All by Devoll</title>
+<meta name="theme-color" content="#e09915"><title>Tomey General Company | El Grande</title>
 <style>'''+CSS+'''</style></head><body><div class="dashboard-layout">
 <aside class="sidebar">
 <a href="/#dashboard" class="sidebar-brand" aria-label="Tomey General Company LLC">
@@ -275,9 +275,7 @@ def page_shell(content):
 <div class="dashboard-workspace">
 <div class="dashboard-header">
 <div class="dashboard-title"><span class="separator"></span>
-<div><strong>EL GRANDE</strong><small>All by Devoll Operations System · Job, Invoicing, and Financial Control</small></div></div>
-<div class="dashboard-company"><div><strong>All by Devoll, LLC</strong><small>A Tomey General Company</small></div>
-<div class="brand-mark-devoll"><img src="/brand/devoll.png" alt="All by Devoll, LLC logo"></div></div>
+<div><strong>TOMEY GENERAL COMPANY</strong><small>Jobs · Appointments · Ledger · Estimates</small></div></div>
 </div><hr class="dashboard-header-rule">
 <main class="dashboard-main">
 '''
