@@ -8,6 +8,7 @@ on:
       - 'integrations/all_by_devoll/**'
       - '.github/workflows/android-device-smoke.yml'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
