@@ -22,7 +22,7 @@ class ShopUITests(unittest.TestCase):
         return desk.render_dashboard()
     def test_operator_branding_not_settlement_branding(self):
         page=self.page()
-        self.assertIn("TOMEY GENERAL COMPANY",page)
+        self.assertIn("<strong>JALE</strong>",page)
         self.assertNotIn("All by Devoll",page)
         self.assertIn("Current Job",page)
         self.assertNotIn("Tomey General 15%",page)
