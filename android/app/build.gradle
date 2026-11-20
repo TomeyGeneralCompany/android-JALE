@@ -55,18 +55,3 @@ chaquopy {
 dependencies {
     implementation 'androidx.core:core:1.15.0'
 }
-
-
-// Generate a launcher icon from the existing Tomey General Company PNG.
-// Keep the asset in its original location; don't duplicate or redraw the logo.
-def jaleIconResources = layout.buildDirectory.dir("generated/jale-launcher-res")
-android.sourceSets.main.res.srcDir(jaleIconResources)
-
-tasks.register('prepareJaleLauncherIcon', Copy) {
-    from(file('../../integrations/all_by_devoll/brand/tomey.png'))
-    into(jaleIconResources.map { it.dir('drawable') })
-    rename('tomey.png', 'jale_launcher.png')
-}
-tasks.named('preBuild').configure {
-    dependsOn(tasks.named('prepareJaleLauncherIcon'))
-}
