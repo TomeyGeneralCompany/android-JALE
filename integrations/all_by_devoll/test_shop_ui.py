@@ -22,7 +22,8 @@ class ShopUITests(unittest.TestCase):
         return desk.render_dashboard()
     def test_operator_branding_not_settlement_branding(self):
         page=self.page()
-        self.assertIn("All by Devoll, LLC",page)
+        self.assertIn("TOMEY GENERAL COMPANY",page)
+        self.assertNotIn("All by Devoll",page)
         self.assertIn("Current Job",page)
         self.assertNotIn("Tomey General 15%",page)
         self.assertNotIn("No invented prices",page)
