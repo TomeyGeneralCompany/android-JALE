@@ -3,11 +3,16 @@ import os
 import secrets
 import sys
 import types
+import traceback
 from decimal import Decimal
 from pathlib import Path
 from threading import Thread
 
 _server_started = False
+_server_error = ""
+
+def startup_error():
+    return _server_error
 
 
 def _android_invoice_adapter(home):
@@ -71,6 +76,14 @@ def start(home, token):
         return original_auth(handler)
 
     desk.Handler.auth = private_auth
-    Thread(target=desk.main, name="el-grande-local-server", daemon=True).start()
+    def run_desk():
+        global _server_error
+        try:
+            desk.main()
+        except BaseException:
+            _server_error = traceback.format_exc()
+            print(_server_error, file=sys.stderr)
+
+    Thread(target=run_desk, name="el-grande-local-server", daemon=True).start()
     _server_started = True
     return "started"
