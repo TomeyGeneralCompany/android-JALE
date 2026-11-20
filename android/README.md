@@ -28,3 +28,5 @@ For repeatable downloads, versioned tag URLs are also available. Do not publish 
 * **Android testing:** Test job creation, changes, appointment saving, finalization, payment recording, invoice PDF sharing, SQLite persistence after force-close/reboot, and device rotation on a real Android phone before offering it to operators.
 
 Source: the uploaded `el-grande-main.zip` was extracted into this independent Android repository. `integrations/all_by_devoll/` is a local copy of the desk source, while mobile-only startup lives in `android/app/src/main/python/mobile_server.py`.
+
+Build validation is performed by the standalone repository's `El Grande Android APK` GitHub Actions workflow.
