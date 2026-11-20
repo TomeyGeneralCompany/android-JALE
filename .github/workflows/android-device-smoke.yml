@@ -49,6 +49,7 @@ jobs:
           emulator-boot-timeout: 600
           disable-animations: true
           script: |
+            set +e
             gradle --no-daemon -p android :app:connectedDebugAndroidTest -PciEmulator
             result=$?
             adb logcat -d -t 6000 > jale-android-logcat.txt || true
