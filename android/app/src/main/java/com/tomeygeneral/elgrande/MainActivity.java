@@ -114,7 +114,7 @@ public class MainActivity extends Activity {
                 .setPositiveButton("Close", (d, w) -> finish()).show());
             return;
         }
-        if (tries >= 80) {
+        if (tries >= 200) {
             startupFailure = "Local desk did not become ready within 20 seconds";
             android.util.Log.e("JALE_STARTUP", startupFailure);
             ui.post(() -> new AlertDialog.Builder(this).setTitle("Startup failed")
@@ -134,7 +134,7 @@ public class MainActivity extends Activity {
                 return;
             }
         } catch (Exception ignored) { }
-        try { Thread.sleep(250); } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
+        try { Thread.sleep(100); } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
         pollReady(tries + 1, loading);
     }
 
