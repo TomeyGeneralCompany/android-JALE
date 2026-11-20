@@ -50,19 +50,25 @@ public class JaleSmokeTest {
     private static String awaitDashboard() throws Exception {
         long end = System.currentTimeMillis() + 90000L;
         Exception last = null;
+        int lastStatus = -1;
+        boolean hadCookie = false;
         while (System.currentTimeMillis() < end) {
             String failure = MainActivity.getStartupFailure();
             if (failure != null && !failure.isEmpty()) throw new AssertionError("JALE startup failure: " + failure);
             try {
                 HttpURLConnection conn = connect("/", "GET");
-                if (conn.getResponseCode() == 200) {
+                hadCookie = CookieManager.getInstance().getCookie(ROOT) != null;
+                lastStatus = conn.getResponseCode();
+                if (lastStatus == 200) {
                     String page = read(conn);
                     if (page.contains("<strong>JALE</strong>")) return page;
                 } else conn.disconnect();
             } catch (Exception e) { last = e; }
             Thread.sleep(500);
         }
-        throw new AssertionError("JALE did not serve dashboard in 90 seconds", last);
+        throw new AssertionError("JALE dashboard unavailable: last HTTP=" + lastStatus +
+                ", session-cookie-present=" + hadCookie + ", startup-error=" +
+                MainActivity.getStartupFailure(), last);
     }
 
     @Test public void launchesWithRealLogoCreatesAndPersistsJob() throws Exception {
