@@ -34,10 +34,14 @@ public class MainActivity extends Activity {
     private WebView web;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private static String processSession;
+    private static volatile String startupFailure;
+
+    public static String getStartupFailure() { return startupFailure; }
     private String session;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        startupFailure = null;
         synchronized (MainActivity.class) {
             if (processSession == null) {
                 byte[] random = new byte[32];
@@ -90,6 +94,8 @@ public class MainActivity extends Activity {
                     .callAttr("start", getFilesDir().getAbsolutePath(), session);
                 pollReady(0, loading);
             } catch (Exception error) {
+                startupFailure = error.toString();
+                android.util.Log.e("JALE_STARTUP", startupFailure, error);
                 ui.post(() -> new AlertDialog.Builder(this)
                     .setTitle("El Grande could not start")
                     .setMessage(error.toString())
@@ -99,7 +105,18 @@ public class MainActivity extends Activity {
     }
 
     private void pollReady(int tries, ProgressBar loading) {
+        String pyError = Python.getInstance().getModule("mobile_server").callAttr("startup_error").toString();
+        if (!pyError.isEmpty()) {
+            startupFailure = pyError;
+            android.util.Log.e("JALE_STARTUP", pyError);
+            ui.post(() -> new AlertDialog.Builder(this).setTitle("JALE could not start")
+                .setMessage("The local job desk failed to start. See app logs for details.")
+                .setPositiveButton("Close", (d, w) -> finish()).show());
+            return;
+        }
         if (tries >= 80) {
+            startupFailure = "Local desk did not become ready within 20 seconds";
+            android.util.Log.e("JALE_STARTUP", startupFailure);
             ui.post(() -> new AlertDialog.Builder(this).setTitle("Startup failed")
                 .setMessage("Local job desk did not become ready. Check Android app logs.")
                 .setPositiveButton("Close", (d, w) -> finish()).show());
