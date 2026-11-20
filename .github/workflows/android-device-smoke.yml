@@ -48,11 +48,14 @@ jobs:
           profile: pixel_6
           emulator-boot-timeout: 600
           disable-animations: true
-          script: gradle --no-daemon -p android :app:connectedDebugAndroidTest -PciEmulator
-      - name: Upload diagnostics on failure
+          script: |
+            gradle --no-daemon -p android :app:connectedDebugAndroidTest -PciEmulator
+            result=$?
+            adb logcat -d -t 6000 > jale-android-logcat.txt || true
+            exit "$result"
+      - name: Preserve diagnostics captured before emulator shutdown
         if: failure()
-        run: |
-          timeout 15s adb logcat -d -t 4000 > jale-android-logcat.txt || true
+        run: test -f jale-android-logcat.txt || touch jale-android-logcat.txt
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
