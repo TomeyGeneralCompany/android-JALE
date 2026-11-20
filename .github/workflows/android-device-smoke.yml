@@ -48,12 +48,7 @@ jobs:
           profile: pixel_6
           emulator-boot-timeout: 600
           disable-animations: true
-          script: |
-            set +e
-            gradle --no-daemon -p android :app:connectedDebugAndroidTest -PciEmulator
-            result=$?
-            adb logcat -d -t 6000 > jale-android-logcat.txt || true
-            exit "$result"
+          script: bash android/ci/run-emulator-smoke.sh
       - name: Preserve diagnostics captured before emulator shutdown
         if: failure()
         run: test -f jale-android-logcat.txt || touch jale-android-logcat.txt
