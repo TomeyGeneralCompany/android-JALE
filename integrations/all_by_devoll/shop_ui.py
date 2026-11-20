@@ -250,7 +250,7 @@ def ticket_page(ticket, con, amounts, estimate_running=False):
 def page_shell(content):
     html_top='''<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#e09915"><title>Tomey General Company | El Grande</title>
+<meta name="theme-color" content="#e09915"><title>JALE | Tomey General Company</title>
 <style>'''+CSS+'''</style></head><body><div class="dashboard-layout">
 <aside class="sidebar">
 <a href="/#dashboard" class="sidebar-brand" aria-label="Tomey General Company LLC">
@@ -275,7 +275,7 @@ def page_shell(content):
 <div class="dashboard-workspace">
 <div class="dashboard-header">
 <div class="dashboard-title"><span class="separator"></span>
-<div><strong>TOMEY GENERAL COMPANY</strong><small>Jobs · Appointments · Ledger · Estimates</small></div></div>
+<div><strong>JALE</strong><small>Jobs · Appointments · Ledger · Estimates</small></div></div>
 </div><hr class="dashboard-header-rule">
 <main class="dashboard-main">
 '''
