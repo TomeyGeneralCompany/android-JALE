@@ -21,3 +21,5 @@ jobs:
       - run: pip install reportlab
       - name: All shop desk regression tests
         run: python -m unittest discover -s integrations/all_by_devoll -p 'test_*.py'
+      - name: JALE Android Python bootstrap smoke test
+        run: python tests/android_bootstrap_smoke.py
