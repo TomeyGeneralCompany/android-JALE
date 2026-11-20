@@ -14,9 +14,9 @@ This uses Chaquopy to package Python, existing dashboard modules, and SQLite. It
 
 Configure these four GitHub Actions secrets: `EL_GRANDE_KEYSTORE_BASE64` (base64 encoding of the JKS file), `EL_GRANDE_STORE_PASSWORD`, `EL_GRANDE_KEY_ALIAS`, and `EL_GRANDE_KEY_PASSWORD`. Keep the original JKS in a safe location; losing it prevents signing compatible future updates.
 
-After merging and validating the Android build, push a version tag such as `android-v0.14.0-1`. The `Publish signed El Grande Android APK` workflow publishes the APK as a GitHub Release asset. Your site can link directly to:
+After validating the Android build, push a version tag such as `android-v0.14.0-1`. The `Publish signed El Grande Android APK` workflow publishes the APK as a GitHub Release asset. Your site can link directly to:
 
-`https://github.com/TomeyGeneralCompany/el-grande/releases/latest/download/el-grande-android.apk`
+`https://github.com/TomeyGeneralCompany/android-JALE/releases/latest/download/el-grande-android.apk`
 
 For repeatable downloads, versioned tag URLs are also available. Do not publish a debug APK as the production website installer.
 
@@ -27,4 +27,4 @@ For repeatable downloads, versioned tag URLs are also available. Do not publish 
 * **APK signing:** Debug artifacts are for installation testing, not a production release/update channel. For production website distribution, configure a protected release signing key in GitHub secrets and publish a release-signed APK. Never commit the signing key or passwords.
 * **Android testing:** Test job creation, changes, appointment saving, finalization, payment recording, invoice PDF sharing, SQLite persistence after force-close/reboot, and device rotation on a real Android phone before offering it to operators.
 
-Source: `integrations/all_by_devoll/` is shared with the desktop version, while mobile-only startup lives in `android/app/src/main/python/mobile_server.py`.
+Source: the uploaded `el-grande-main.zip` was extracted into this independent Android repository. `integrations/all_by_devoll/` is a local copy of the desk source, while mobile-only startup lives in `android/app/src/main/python/mobile_server.py`.
