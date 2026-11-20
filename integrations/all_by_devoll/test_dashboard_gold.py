@@ -38,8 +38,8 @@ class DashboardGoldTests(unittest.TestCase):
         self.assertNotIn('src="/brand/devoll.png"',html)
         self.assertIn('class="sidebar-brand"',html)
         self.assertIn("Tomey General Company LLC logo",html)
-        self.assertIn("<strong>TOMEY GENERAL COMPANY</strong>",html)
-        self.assertIn("<title>Tomey General Company | El Grande</title>",html)
+        self.assertIn("<strong>JALE</strong>",html)
+        self.assertIn("<title>JALE | Tomey General Company</title>",html)
         self.assertNotIn("All by Devoll",html)
         self.assertIn(".sidebar-brand {display:flex;width:108px;height:88px",mavis_theme.CSS)
     def test_house_gold_red_box_and_teal_cards(self):
