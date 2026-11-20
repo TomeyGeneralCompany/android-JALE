@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'integrations/all_by_devoll/**'
+      - 'tests/android_bootstrap_smoke.py'
       - '.github/workflows/tomey-dashboard-tests.yml'
   workflow_dispatch:
 
