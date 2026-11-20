@@ -214,7 +214,6 @@ gap:6px 18px;font-weight:600}
  .dashboard-overview {grid-template-columns:1fr}
  .dashboard-overview .overview-wide {grid-column:auto}
 }
-"""
 
 /* Single-brand Tomey General Company title, including small Android screens. */
 .dashboard-title strong {overflow-wrap:anywhere}
@@ -223,3 +222,4 @@ gap:6px 18px;font-weight:600}
  .sidebar-brand {width:94px;height:80px}
  .sidebar-brand img {width:68px;height:68px}
 }
+"""
