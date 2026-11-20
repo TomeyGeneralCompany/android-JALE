@@ -53,7 +53,7 @@ with tempfile.TemporaryDirectory() as home:
     status, typ, page = request("/", session)
     assert status == 200 and b"<strong>JALE</strong>" in page, (status, typ)
     status, typ, logo = request("/brand/tomey.png", session)
-    assert status == 200 and typ.startswith("image/png") and logo.startswith(b"\\x89PNG"), (status, typ)
+    assert status == 200 and typ.startswith("image/png") and logo[:4] == bytes((137, 80, 78, 71)), (status, typ)
     customer = "JALE offline smoke " + secrets.token_hex(6)
     data = urlencode({"customer": customer, "problem": "Offline Android work", "service": "Mobile service"})
     status, _, _ = request("/ticket/new", session, data)
