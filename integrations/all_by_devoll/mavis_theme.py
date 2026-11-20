@@ -133,7 +133,7 @@ footer {border-top:1px solid #fff;color:#fff}
   .cards {grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 }
 
-/* All by Devoll gold-and-teal design, with a red parent-company logo corner.
+/* Tomey General Company gold-and-teal design, with the red logo corner.
    Matches the supplied reference without adding textures or gradients. */
 header,nav {background:#e09915!important}
 body {background:#e09915!important}
@@ -149,7 +149,6 @@ button:hover,.button:hover,.action:hover,.details summary:hover {background:#008
   width:208px;max-width:100%;height:144px;
 }
 .brand-mark-parent img {width:128px;height:128px;object-fit:contain}
-.brand-mark-devoll img {width:110px;height:110px;object-fit:contain}
 .dashboard-layout {display:grid;grid-template-columns:233px minmax(0,1fr);gap:22px;max-width:1462px;margin:auto;padding:0 15px}
 .sidebar {min-width:0;padding:0}
 .sidebar-brand {border-radius:15px;border:3px solid #00c4bf;background:#c9031e;
@@ -164,11 +163,8 @@ font-size:18px;font-weight:700;padding:16px 19px;text-decoration:none}
 .dashboard-header {display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:145px}
 .dashboard-title {display:flex;gap:24px;align-items:center;min-width:0}
 .dashboard-title .separator {height:100px;border-left:3px solid white;flex:none}
-.dashboard-title strong {font-size:64px;line-height:1.05;letter-spacing:0;font-weight:800}
+.dashboard-title strong {font-size:clamp(30px,4vw,52px);line-height:1.05;letter-spacing:0;font-weight:800}
 .dashboard-title small {display:block;font-size:17px;color:white}
-.dashboard-company {display:flex;align-items:center;gap:16px;text-align:right}
-.dashboard-company strong {font-size:24px}
-.dashboard-company small {display:block;color:white;font-size:15px}
 .dashboard-main {margin:0!important;padding:0!important;max-width:none!important}
 .dashboard-overview {display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .dashboard-overview .overview-wide {grid-column:1/-1}
@@ -194,22 +190,20 @@ gap:6px 18px;font-weight:600}
  .dashboard-layout {grid-template-columns:190px minmax(0,1fr)}
  .dashboard-title strong {font-size:46px}
  .dashboard-title small {font-size:14px}
- .dashboard-company strong {font-size:18px}
  .sidebar-brand {height:127px}
  .sidebar-brand img {width:112px;height:112px}
  .sidebar-links a {font-size:15px;padding:13px}
 }
 @media(max-width:800px) {
  .dashboard-layout {display:block}
- .sidebar-brand {display:none}
+ .sidebar-brand {display:flex;width:108px;height:88px;margin:8px 0 12px}
+ .sidebar-brand img {width:76px;height:76px}
  .sidebar-links {flex-direction:row;flex-wrap:wrap;margin:8px 0 15px;gap:7px}
  .sidebar-links a {font-size:13px;padding:9px 12px}
  .sidebar-bottom {display:none}
  .dashboard-header {min-height:110px}
- .dashboard-company {gap:8px}
- .brand-mark-devoll img {width:68px;height:68px}
  .dashboard-title strong {font-size:34px}
- .dashboard-title small,.dashboard-company small {font-size:11px}
+ .dashboard-title small {font-size:11px}
  .dashboard-overview h2 {font-size:22px}
 }
 @media(max-width:560px) {
@@ -217,9 +211,15 @@ gap:6px 18px;font-weight:600}
  .dashboard-title .separator {height:70px}
  .dashboard-title {gap:9px}
  .dashboard-title strong {font-size:25px}
- .dashboard-company {flex-direction:column-reverse;align-items:flex-end;text-align:right}
- .dashboard-company strong {font-size:13px}
  .dashboard-overview {grid-template-columns:1fr}
  .dashboard-overview .overview-wide {grid-column:auto}
 }
 """
+
+/* Single-brand Tomey General Company title, including small Android screens. */
+.dashboard-title strong {overflow-wrap:anywhere}
+@media(max-width:560px) {
+ .dashboard-title strong {font-size:clamp(21px,6.1vw,30px)}
+ .sidebar-brand {width:94px;height:80px}
+ .sidebar-brand img {width:68px;height:68px}
+}
