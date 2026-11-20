@@ -63,9 +63,8 @@ jobs:
           test -f _mobile_source/android/app/build.gradle
           cp -a _mobile_source/android ./android
           mkdir -p .github/workflows
-          cp _mobile_source/.github/workflows/android-apk.yml .github/workflows/android-apk.yml
-          cp _mobile_source/.github/workflows/android-release.yml .github/workflows/android-release.yml
           rm -rf _mobile_source
+          find .github/workflows -maxdepth 1 -type f ! -name import-android.yml -delete
       - name: Check source and commit extraction
         run: |
           test -f integrations/all_by_devoll/desk.py
