@@ -1,0 +1,82 @@
+name: Import El Grande archive and Android edition
+
+on:
+  push:
+    paths:
+      - '.github/workflows/import-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out android-JALE
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Check out isolated Android edition source
+        uses: actions/checkout@v4
+        with:
+          repository: TomeyGeneralCompany/el-grande
+          ref: feature/standalone-android-apk
+          path: _mobile_source
+          persist-credentials: false
+      - name: Unpack original user-supplied ZIP safely
+        run: |
+          python3 - <<'PY'
+          import os
+          import shutil
+          import zipfile
+          from pathlib import Path
+          archive = Path('el-grande-main.zip')
+          if not archive.is_file():
+              raise SystemExit('Missing supplied El Grande ZIP')
+          with zipfile.ZipFile(archive) as z:
+              members = [m for m in z.infolist() if not m.is_dir()]
+              names = [Path(m.filename).parts for m in members]
+              if not names:
+                  raise SystemExit('ZIP is empty')
+              prefix = names[0][0] if all(len(n) > 1 and n[0] == names[0][0] for n in names) else None
+              count = 0
+              for m in members:
+                  parts = Path(m.filename).parts
+                  if prefix:
+                      parts = parts[1:]
+                  if not parts or any(p in ('..', '.', '') for p in parts) or m.filename.startswith('/'):
+                      raise SystemExit('Unsafe archive member: ' + m.filename)
+                  if ((m.external_attr >> 16) & 0o170000) == 0o120000:
+                      raise SystemExit('Symlink inside archive: ' + m.filename)
+                  dest = Path(*parts)
+                  if str(dest).startswith('.git/') or dest == Path('.git') or str(dest).startswith('_mobile_source/'):
+                      raise SystemExit('Unsafe destination: ' + str(dest))
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  with z.open(m) as src, dest.open('wb') as dst:
+                      shutil.copyfileobj(src, dst)
+                  count += 1
+              print('Extracted', count, 'files from ZIP')
+          PY
+      - name: Bring over Android source and APK release workflows
+        run: |
+          test -f _mobile_source/android/app/build.gradle
+          cp -a _mobile_source/android ./android
+          mkdir -p .github/workflows
+          cp _mobile_source/.github/workflows/android-apk.yml .github/workflows/android-apk.yml
+          cp _mobile_source/.github/workflows/android-release.yml .github/workflows/android-release.yml
+          rm -rf _mobile_source
+      - name: Check source and commit extraction
+        run: |
+          test -f integrations/all_by_devoll/desk.py
+          test -f android/app/src/main/java/com/tomeygeneral/elgrande/MainActivity.java
+          python3 -m compileall -q integrations/all_by_devoll android/app/src/main/python
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'Already imported'
+          else
+            git commit -m 'Clone El Grande archive and add independent Android app'
+            git push
+          fi
