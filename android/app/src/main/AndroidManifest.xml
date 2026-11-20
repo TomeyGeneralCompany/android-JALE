@@ -4,7 +4,8 @@
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="true"
-        android:label="El Grande"
+        android:label="JALE"
+        android:icon="@drawable/jale_launcher"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:name="com.chaquo.python.android.PyApplication">
         <activity android:name=".MainActivity" android:exported="true">
