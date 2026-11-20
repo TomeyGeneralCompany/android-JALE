@@ -51,6 +51,8 @@ public class JaleSmokeTest {
         long end = System.currentTimeMillis() + 90000L;
         Exception last = null;
         while (System.currentTimeMillis() < end) {
+            String failure = MainActivity.getStartupFailure();
+            if (failure != null && !failure.isEmpty()) throw new AssertionError("JALE startup failure: " + failure);
             try {
                 HttpURLConnection conn = connect("/", "GET");
                 if (conn.getResponseCode() == 200) {
