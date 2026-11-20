@@ -25,25 +25,27 @@ class DashboardGoldTests(unittest.TestCase):
         self.tmp.cleanup()
     def page(self):
         return desk.render_dashboard()
-    def test_two_real_logos_are_bundled_pngs(self):
+    def test_only_tomey_brand_is_displayed(self):
         root=Path(shop_ui.__file__).parent/"brand"
-        for name in ("tomey.png","devoll.png"):
-            raw=(root/name).read_bytes()
-            self.assertTrue(raw.startswith(b"\x89PNG\r\n\x1a\n"))
-            self.assertGreater(len(raw),2000)
-            width,height=struct.unpack(">II",raw[16:24])
-            self.assertGreaterEqual(width,96)
-            self.assertEqual(width,height)
+        raw=(root/"tomey.png").read_bytes()
+        self.assertTrue(raw.startswith(b"\x89PNG\r\n\x1a\n"))
+        self.assertGreater(len(raw),2000)
+        width,height=struct.unpack(">II",raw[16:24])
+        self.assertGreaterEqual(width,96)
+        self.assertEqual(width,height)
         html=self.page()
         self.assertIn('src="/brand/tomey.png"',html)
-        self.assertIn('src="/brand/devoll.png"',html)
+        self.assertNotIn('src="/brand/devoll.png"',html)
         self.assertIn('class="sidebar-brand"',html)
         self.assertIn("Tomey General Company LLC logo",html)
-        self.assertIn("All by Devoll, LLC logo",html)
+        self.assertIn("<strong>TOMEY GENERAL COMPANY</strong>",html)
+        self.assertIn("<title>Tomey General Company | El Grande</title>",html)
+        self.assertNotIn("All by Devoll",html)
+        self.assertIn(".sidebar-brand {display:flex;width:108px;height:88px",mavis_theme.CSS)
     def test_house_gold_red_box_and_teal_cards(self):
         css=mavis_theme.CSS
         for phrase in ("background:#e09915","background:#c9031e","border:3px solid #00c4bf",
-                       ".dashboard-overview",".sidebar-links",".dashboard-company"):
+                       ".dashboard-overview",".sidebar-links",".dashboard-title"):
             self.assertIn(phrase,css)
     def test_real_job_data_and_no_fake_activity(self):
         job,_=desk.create_ticket({
