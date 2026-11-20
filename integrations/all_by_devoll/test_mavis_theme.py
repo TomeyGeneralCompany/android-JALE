@@ -37,7 +37,8 @@ class MavisThemeTests(unittest.TestCase):
 
     def test_job_desk_uses_same_mavis_style(self):
         output=desk.render_dashboard()
-        self.assertIn("All by Devoll, LLC",output)
+        self.assertIn("TOMEY GENERAL COMPANY",output)
+        self.assertNotIn("All by Devoll",output)
         self.assertIn('href="/bank"',output)
         self.assertIn("--panel-teal: #00c4bf",output)
         self.assertIn("background:#e09915",output)
