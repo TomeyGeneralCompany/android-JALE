@@ -54,6 +54,8 @@ def account_panel(con, row, current):
         contacts.append(esc(row["email"]))
     if row["website"]:
         contacts.append(link(row["website"], "Open website or listing"))
+    if os.getenv("JALE_ANDROID") == "1":
+        contacts.append(link(f"/office/call-coach/{account_id}", "Call with live coach"))
     contact = "<p>" + " · ".join(contacts) + "</p>" if contacts else ""
     history = con.execute("SELECT * FROM office_calls WHERE account_id=? ORDER BY id DESC LIMIT 10",
                           (account_id,)).fetchall()

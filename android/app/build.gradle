@@ -3,8 +3,33 @@ plugins {
     id 'com.chaquo.python'
 }
 
+def coachWeb = rootProject.file('call-coach')
+def coachAssets = layout.buildDirectory.dir('generated/call-coach-assets')
+def installCoachWeb = tasks.register('installCoachWeb', Exec) {
+    workingDir coachWeb
+    commandLine 'npm', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'
+    inputs.files new File(coachWeb, 'package.json'), new File(coachWeb, 'package-lock.json')
+    outputs.dir new File(coachWeb, 'node_modules')
+}
+def bundleCoachWeb = tasks.register('bundleCoachWeb', Exec) {
+    dependsOn installCoachWeb
+    workingDir coachWeb
+    commandLine 'npm', 'run', 'bundle'
+    inputs.files new File(coachWeb, 'sip-entry.js'), new File(coachWeb, 'package-lock.json'),
+            new File(coachWeb, 'SIP-LICENSE.md'), new File(coachWeb, 'MOONSHINE-LICENSE.md')
+    outputs.dir coachAssets
+    doLast {
+        copy {
+            from coachWeb
+            include 'SIP-LICENSE.md', 'MOONSHINE-LICENSE.md'
+            into coachAssets
+        }
+    }
+}
+
 android {
     namespace 'com.tomeygeneral.elgrande'
+    sourceSets.main.assets.srcDir(coachAssets)
     compileSdk 35
     ndkVersion "27.2.12479018"
     // GGUF is packaged without compression, allowing size verification and fast extraction.
@@ -63,7 +88,10 @@ chaquopy {
     }
 }
 
+tasks.named('preBuild').configure { dependsOn bundleCoachWeb }
+
 dependencies {
+    implementation 'ai.moonshine:moonshine-voice:0.1.6'
     implementation 'androidx.core:core:1.15.0'
     androidTestImplementation 'androidx.test:runner:1.6.2'
     androidTestImplementation 'androidx.test:core:1.6.1'
