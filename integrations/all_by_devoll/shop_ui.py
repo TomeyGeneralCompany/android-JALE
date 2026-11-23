@@ -5,6 +5,7 @@ No third-party assets, scripts, fonts, analytics, or CDN dependencies.
 """
 import html
 import os
+import os
 from decimal import Decimal
 from urllib.parse import urlencode
 
@@ -122,7 +123,7 @@ def ticket_page(ticket, con, amounts, estimate_running=False):
     else:
         attached=con.execute("SELECT * FROM ticket_parts WHERE ticket_id=? ORDER BY supplier,sku",(n,)).fetchall()
         ai_event=con.execute("""SELECT event FROM events WHERE ticket_id=?
-            AND event IN ('internal_ai_estimate','internal_ai_failed') ORDER BY id DESC LIMIT 1""",(n,)).fetchone()
+            AND event IN ('internal_ai_estimate','internal_ai_failed','internal_offline_draft') ORDER BY id DESC LIMIT 1""",(n,)).fetchone()
     status=ticket["status"]
     info="".join('<div><span>'+label+'</span><b>'+esc(value or "Not supplied")+'</b></div>' for label,value in
                  (("Phone",ticket["phone"]),("Location",ticket["location"]),("Equipment",ticket["machine"]),("Reported problem",ticket["problem"])))
@@ -162,10 +163,15 @@ def ticket_page(ticket, con, amounts, estimate_running=False):
         if estimate_running:
             estimate_controls='<p role="status">Estimate running. Reload this job to check the result.</p>'
         else:
-            estimate_controls=postform('/ticket/'+str(n)+'/suggest',"Generate labor & diagnostic estimate","action secondary")
+            offline_mode=os.getenv("JALE_ANDROID")=="1" and not os.getenv("ABD_OLLAMA_URL")
+            button_title=("Draft offline diagnostic checklist" if offline_mode
+                          else "Generate labor & diagnostic estimate")
+            estimate_controls=postform('/ticket/'+str(n)+'/suggest',button_title,"action secondary")
             if ai_event and ai_event["event"]=="internal_ai_failed":
                 estimate_controls='<p role="status">The latest estimate failed. Try again.</p>'+estimate_controls
-        right+=('<div class="minisection"><h3>AI assistance</h3>'+estimate_controls+
+        assist_heading=("Diagnostic assistance" if os.getenv("JALE_ANDROID")=="1"
+                        and not os.getenv("ABD_OLLAMA_URL") else "AI assistance")
+        right+=('<div class="minisection"><h3>'+assist_heading+'</h3>'+estimate_controls+
                 ('<pre class="ai">'+esc(ticket["ai_notes"])+'</pre>' if ticket["ai_notes"] else '')+'</div></section>')
         inner.append('<div class="working">'+left+right+'</div>')
         completedform=('<section class="worksection" id="finish-'+str(n)+'"><h3>Finish this job</h3>'
