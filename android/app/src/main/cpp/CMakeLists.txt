@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(jale_qwen LANGUAGES C CXX)
 
+# The APK is debug-signed for sideloading, but inference must run with
+# release-level native CPU optimizations on real phones and the emulator.
+set(CMAKE_C_FLAGS_DEBUG "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_DEBUG "-O3 -DNDEBUG")
+
 # The llama.cpp checkout is pinned and downloaded in android/ci/prepare-qwen.sh.
 set(LLAMA_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../../third_party/llama.cpp")
 if(NOT EXISTS "${LLAMA_ROOT}/CMakeLists.txt")
