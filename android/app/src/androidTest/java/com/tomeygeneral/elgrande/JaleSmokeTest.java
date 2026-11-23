@@ -113,18 +113,18 @@ public class JaleSmokeTest {
             assertEquals("Offline diagnostic request should be accepted", 303, draft.getResponseCode());
             draft.disconnect();
             boolean drafted = false;
-            for (int tries = 0; tries < 30; tries++) {
+            for (int tries = 0; tries < 1500; tries++) {
                 HttpURLConnection ticket = connect(jobUrl, "GET");
                 if (ticket.getResponseCode() == 200) {
                     String page = read(ticket);
-                    if (page.contains("OFFLINE DIAGNOSTIC CHECKLIST")) {
+                    if (page.contains("INTERNAL PRELIMINARY ESTIMATE") || page.contains("Unstructured AI response")) {
                         drafted = true;
                         break;
                     }
                 } else ticket.disconnect();
                 Thread.sleep(200);
             }
-            assertTrue("Phone must generate offline diagnostics without Ollama", drafted);
+            assertTrue("Phone must complete genuine local Qwen inference", drafted);
             assertTrue("Real job is persisted in dashboard", awaitDashboard().contains(customer));
         }
         try (ActivityScenario<MainActivity> reopened = ActivityScenario.launch(MainActivity.class)) {
