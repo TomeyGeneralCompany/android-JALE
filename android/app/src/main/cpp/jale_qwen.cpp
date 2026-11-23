@@ -45,7 +45,6 @@ std::string generate(const std::string & model_path, const std::string & prompt,
         }
         auto mp = llama_model_default_params();
         mp.n_gpu_layers = 0;
-        mp.use_mmap = true;
         cached_model = llama_model_load_from_file(model_path.c_str(), mp);
         if (!cached_model) throw std::runtime_error("Could not load bundled Qwen GGUF");
         cached_path = model_path;
