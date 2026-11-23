@@ -99,8 +99,32 @@ public class JaleSmokeTest {
                 out.write(body.getBytes(StandardCharsets.UTF_8));
             }
             assertEquals("Job creation should redirect", 303, create.getResponseCode());
+            String jobUrl = create.getHeaderField("Location");
             create.disconnect();
 
+            assertTrue("Job URL returned", jobUrl != null && jobUrl.matches("/ticket/[0-9]+"));
+            HttpURLConnection draft = connect(jobUrl + "/suggest", "POST");
+            draft.setDoOutput(true);
+            draft.setRequestProperty("Origin", ROOT);
+            draft.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            try (OutputStream out = draft.getOutputStream()) {
+                out.write(new byte[0]);
+            }
+            assertEquals("Offline diagnostic request should be accepted", 303, draft.getResponseCode());
+            draft.disconnect();
+            boolean drafted = false;
+            for (int tries = 0; tries < 30; tries++) {
+                HttpURLConnection ticket = connect(jobUrl, "GET");
+                if (ticket.getResponseCode() == 200) {
+                    String page = read(ticket);
+                    if (page.contains("OFFLINE DIAGNOSTIC CHECKLIST")) {
+                        drafted = true;
+                        break;
+                    }
+                } else ticket.disconnect();
+                Thread.sleep(200);
+            }
+            assertTrue("Phone must generate offline diagnostics without Ollama", drafted);
             assertTrue("Real job is persisted in dashboard", awaitDashboard().contains(customer));
         }
         try (ActivityScenario<MainActivity> reopened = ActivityScenario.launch(MainActivity.class)) {
