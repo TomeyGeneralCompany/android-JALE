@@ -248,7 +248,10 @@ def _import_mailbox_locked():
         valid=(info[0].decode(errors="replace") if info and info[0] else "unknown")
         for uid in ids:
             uidstr=uid.decode()
-            marker=f"imap:{mailbox_user}:{IMAP_FOLDER}:{valid}:{uidstr}"
+            source_marker=f"imap:{mailbox_user}:{IMAP_FOLDER}:{valid}:{uidstr}"
+            # Reconsider old messages skipped by the previous narrow subject
+            # filter once, while keeping the ticket source identity unchanged.
+            marker="v2:"+source_marker
             with db() as con:
                 if con.execute("SELECT 1 FROM importer WHERE key=?", (marker,)).fetchone():continue
             result,records=conn.uid("fetch",uid,"(RFC822)")
@@ -267,7 +270,7 @@ def _import_mailbox_locked():
             if evidence >= 2 and (ticket_subject or evidence >= 3):
                 if fields.get("phone") or fields.get("problem") or fields.get("machine"):
                     message_id=msg.get("Message-ID","").strip()
-                    source_id="email:"+message_id if message_id else marker
+                    source_id="email:"+message_id if message_id else source_marker
                     _,added=create_ticket(fields,source_id,body)
                     if added:count+=1
             with db() as con:
