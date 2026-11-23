@@ -80,10 +80,10 @@ class MobileIntegrationTests(unittest.TestCase):
         job_id, _=desk.create_ticket({
             "customer":"Phone owner","service":"Brake repair",
             "problem":"Brake squeal","machine":"2017 truck"},"manual:qwen-native-test")
-        with patch.dict(os.environ,{"JALE_ANDROID":"1"},clear=True), \\
-             patch.dict(sys.modules,{"java":mock_java}), \\
-             patch.object(desk.urllib.request,"urlopen",
-                          side_effect=AssertionError("Android must not call network model")):
+        with (patch.dict(os.environ, {"JALE_ANDROID": "1"}, clear=True),
+              patch.dict(sys.modules, {"java": mock_java}),
+              patch.object(desk.urllib.request, "urlopen",
+                           side_effect=AssertionError("Android must not call network model"))):
             desk.suggest(job_id)
         self.assertEqual(len(calls),1)
         self.assertIn("Brake squeal",calls[0])
