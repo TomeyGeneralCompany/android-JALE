@@ -42,6 +42,7 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         startupFailure = null;
+        QwenNative.initialize(getApplicationContext());
         synchronized (MainActivity.class) {
             if (processSession == null) {
                 byte[] random = new byte[32];
