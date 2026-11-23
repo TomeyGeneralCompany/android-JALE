@@ -35,7 +35,7 @@ public final class QwenNative {
         if (prompt == null || prompt.isEmpty()) throw new IOException("Empty AI request");
         final File model = ensureModel(context);
         Log.i("JALE_QWEN", "Generating from bundled local Qwen model");
-        return nativeGenerate(model.getAbsolutePath(), prompt, 640);
+        return nativeGenerate(model.getAbsolutePath(), prompt, 320);
     }
 
     public static boolean modelReady() {
