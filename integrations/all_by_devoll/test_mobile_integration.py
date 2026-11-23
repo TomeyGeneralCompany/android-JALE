@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 import desk
 import office_settings
-import offline_diagnostics
 
 
 class MobileIntegrationTests(unittest.TestCase):
@@ -64,23 +63,35 @@ class MobileIntegrationTests(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["customer"], "Jane Mobile")
 
-    def test_android_offline_draft_without_ollama(self):
-        job_id, _ = desk.create_ticket({
-            "customer":"Test Mobile",
-            "service":"Brake repair",
-            "problem":"Brakes squealing",
-            "machine":"2017 truck"}, "manual:mobile-diagnostics")
-        with patch.dict(os.environ, {"JALE_ANDROID":"1"}, clear=True):
+    def test_android_real_qwen_inference_path(self):
+        import sys
+        import types
+        calls=[]
+        class FakeQwen:
+            @staticmethod
+            def generate(prompt):
+                calls.append(prompt)
+                return ('{"labor_hours_min":1,"labor_hours_max":2,'
+                        '"diagnostic_steps":["Inspect brakes"],'
+                        '"parts_to_check":["brake pads"],'
+                        '"uncertainties":["vehicle condition"]}')
+        mock_java = types.ModuleType("java")
+        mock_java.jclass=lambda name: FakeQwen if name == "com.tomeygeneral.elgrande.QwenNative" else None
+        job_id, _=desk.create_ticket({
+            "customer":"Phone owner","service":"Brake repair",
+            "problem":"Brake squeal","machine":"2017 truck"},"manual:qwen-native-test")
+        with patch.dict(os.environ,{"JALE_ANDROID":"1"},clear=True), \\
+             patch.dict(sys.modules,{"java":mock_java}), \\
+             patch.object(desk.urllib.request,"urlopen",
+                          side_effect=AssertionError("Android must not call network model")):
             desk.suggest(job_id)
-            page = desk.render_ticket(job_id)
-        self.assertIn("OFFLINE DIAGNOSTIC CHECKLIST", page)
-        self.assertIn("Brake components", page)
-        self.assertNotIn("Suggested labor range:", page)
-
-    def test_draft_never_makes_up_prices_or_vehicle_fitment(self):
-        result=offline_diagnostics.draft({"service":"Scrap removal", "problem":"Remove old fencing"})
-        self.assertIn("Loading supplies", result)
-        self.assertIn("No prices, diagnosis or labor hours have been inferred.", result)
+        self.assertEqual(len(calls),1)
+        self.assertIn("Brake squeal",calls[0])
+        self.assertIn("/no_think",calls[0])
+        page=desk.render_ticket(job_id)
+        self.assertIn("Inspect brakes",page)
+        self.assertIn("Suggested labor range",page)
+        self.assertNotIn("OFFLINE DIAGNOSTIC CHECKLIST",page)
 
 
 if __name__ == "__main__":
