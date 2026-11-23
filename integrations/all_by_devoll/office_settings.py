@@ -176,14 +176,6 @@ border-radius:9px;color:white;font-weight:700;list-style:none;display:inline-blo
 <form method="post" action="/settings/test-gmail"><button type="submit">Test Gmail connection</button></form>
 <form method="post" action="/settings/sync-gmail"><button type="submit">Sync Gmail now</button></form>
 </details></section>
-""" + ("" if os.getenv("JALE_ANDROID")=="1" else """
-<section><h2>Diagnostic AI</h2>
-<p class="muted">Optional: configure an Ollama server for the desktop installation.</p>
-<form method="post" action="/settings/save">
-<label>Ollama API URL<input name="ABD_OLLAMA_URL" type="url" placeholder="http://127.0.0.1:11434/api/generate" value=\\""""+escape(settings.get("ABD_OLLAMA_URL",""))+"""\\"></label>
-<label>Model<input name="ABD_OLLAMA_MODEL" value=\\""""+escape(settings.get("ABD_OLLAMA_MODEL","qwen3:4b"))+"""\\"></label>
-<button type="submit">Save AI connection</button></form>
-</section>""") + """
 <section><h2>Bank account</h2>
 <p class="muted">Keep the business bank's identifying details with the office settings.</p>
 """+('<p><strong>'+bank_display+'</strong></p>' if bank_saved else "")+"""
