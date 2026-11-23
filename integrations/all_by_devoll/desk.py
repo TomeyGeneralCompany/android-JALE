@@ -34,7 +34,6 @@ import job_reports
 import job_calendar
 import shop_ui
 import office_settings
-import offline_diagnostics
 import customer_payments
 import bank_ledger
 import bank_ui
