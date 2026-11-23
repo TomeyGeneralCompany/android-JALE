@@ -30,10 +30,19 @@ jobs:
         run: |
           export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+      - name: Cache pinned mobile Qwen model and llama.cpp source
+        uses: actions/cache@v4
+        with:
+          path: |
+            android/third_party/llama.cpp
+            android/app/src/main/assets/Qwen3-0.6B-Q4_K_M.gguf
+          key: jale-qwen3-0.6b-q4km-1208e45-llama-969d733
+      - name: Prepare bundled native Qwen engine and GGUF
+        run: bash android/ci/prepare-qwen.sh
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
