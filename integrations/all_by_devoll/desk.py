@@ -33,6 +33,7 @@ import work_orders
 import job_reports
 import job_calendar
 import shop_ui
+import call_coach
 import office_automation
 import office_leads
 import office_margins
@@ -645,6 +646,25 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.auth():return
         path=urlsplit(self.path).path
+        if os.getenv("JALE_ANDROID") == "1" and path.startswith("/office/call-"):
+            page_match = re.fullmatch(r"/office/call-coach/([0-9]{1,19})", path)
+            if page_match:
+                try:
+                    with closing(db()) as con:
+                        page = call_coach.page(con, page_match.group(1))
+                except (ValueError, LookupError):
+                    return self.response_text("Lead not found", 404, "text/plain")
+                policy = ("default-src 'none'; script-src 'self'; worker-src 'self'; "
+                          "style-src 'unsafe-inline'; img-src 'self'; media-src 'self' blob:; "
+                          "connect-src 'self' wss:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+                self.response_headers(csp=policy)
+                self.wfile.write(page.encode("utf-8"))
+                return
+            if path == "/office/call-assets/sip.js":
+                return self.response_text(str(call_coach.native().bundle()), typ="application/javascript")
+            if path in ("/office/call-assets/coach.js", "/office/call-assets/pcm.js"):
+                return self.response_text((call_coach.ASSETS / path.rsplit("/", 1)[1]).read_text(encoding="utf-8"),
+                                          typ="application/javascript")
         if path in ("/brand/tomey.png","/brand/devoll.png"):
             asset=Path(__file__).resolve().parent/"brand"/path.rsplit("/",1)[-1]
             if not asset.is_file():
@@ -826,12 +846,25 @@ class Handler(BaseHTTPRequestHandler):
             expected=PUBLIC_ORIGIN or f"http://{self.headers.get('Host')}"
             if origin!=expected:return self.response_text("Invalid origin",403,"text/plain")
         size=int(self.headers.get("Content-Length","0") or 0)
-        if size>25000:return self.response_text("Request too large",413,"text/plain")
+        if size<0 or size>35000:return self.response_text("Request too large",413,"text/plain")
         if self.headers.get("Content-Type","").split(";")[0]!="application/x-www-form-urlencoded":
             return self.response_text("Unsupported content type",415,"text/plain")
         data={k:v[0] for k,v in parse_qs(self.rfile.read(size).decode("utf-8",errors="replace"),keep_blank_values=True).items()}
         path=urlsplit(self.path).path
         try:
+            speech = re.fullmatch(r"/office/call-speech/(prepare|start|audio|stop)", path)
+            if speech and os.getenv("JALE_ANDROID") == "1":
+                action = speech.group(1)
+                try:
+                    result = call_coach.speech_action(action, data)
+                    return self.response_text(json.dumps(result), typ="application/json")
+                except ValueError as error:
+                    return self.response_text(json.dumps({"error": str(error)}), 400, "application/json")
+                except Exception:
+                    message = ("Could not prepare the speech model. Check your connection and Android version."
+                               if action == "prepare" else "The local transcription session is unavailable.")
+                    log.warning("Call transcription failed during %s", action)
+                    return self.response_text(json.dumps({"error": message}), 409, "application/json")
             if path.startswith("/office/"):
                 with closing(db()) as con, con:
                     con.execute("BEGIN IMMEDIATE")

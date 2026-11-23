@@ -12,6 +12,9 @@ import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.WebResourceRequest;
+import android.webkit.PermissionRequest;
+import android.webkit.WebChromeClient;
+import android.content.pm.PackageManager;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
@@ -38,11 +41,14 @@ public class MainActivity extends Activity {
 
     public static String getStartupFailure() { return startupFailure; }
     private String session;
+    private PermissionRequest pendingMicrophone;
+    private static final int CALL_MICROPHONE = 150;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         startupFailure = null;
         QwenNative.initialize(getApplicationContext());
+        CallSpeech.initialize(getApplicationContext());
         synchronized (MainActivity.class) {
             if (processSession == null) {
                 byte[] random = new byte[32];
@@ -72,6 +78,31 @@ public class MainActivity extends Activity {
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setCookie(ROOT, "eg_session=" + session +
                 "; Path=/; HttpOnly; SameSite=Strict", ignored -> CookieManager.getInstance().flush());
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override public void onPermissionRequest(PermissionRequest request) {
+                String page = web.getUrl();
+                if (!ROOT.equals(request.getOrigin().toString().replaceAll("/$", ""))
+                        || page == null || !page.matches(java.util.regex.Pattern.quote(ROOT) + "/office/call-coach/[0-9]+")
+                        || !java.util.Arrays.equals(request.getResources(),
+                            new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE})) {
+                    request.deny();
+                    return;
+                }
+                if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    request.grant(request.getResources());
+                } else if (pendingMicrophone == null) {
+                    pendingMicrophone = request;
+                    requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, CALL_MICROPHONE);
+                } else {
+                    request.deny();
+                }
+            }
+
+            @Override public void onPermissionRequestCanceled(PermissionRequest request) {
+                if (pendingMicrophone == request) pendingMicrophone = null;
+            }
+        });
         web.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
                 Uri uri = req.getUrl();
@@ -170,11 +201,24 @@ public class MainActivity extends Activity {
         }, "invoice-share").start();
     }
 
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode != CALL_MICROPHONE || pendingMicrophone == null) return;
+        PermissionRequest request = pendingMicrophone;
+        pendingMicrophone = null;
+        if (results.length == 1 && results[0] == PackageManager.PERMISSION_GRANTED) {
+            request.grant(request.getResources());
+        } else {
+            request.deny();
+        }
+    }
+
     @Override public void onBackPressed() {
         if (web.canGoBack()) web.goBack(); else super.onBackPressed();
     }
 
     @Override protected void onDestroy() {
+        if (pendingMicrophone != null) pendingMicrophone.deny();
         if (web != null) web.destroy();
         super.onDestroy();
     }

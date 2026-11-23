@@ -10,3 +10,4 @@ integrations/all_by_devoll/.env
 integrations/all_by_devoll/desk.env
 integrations/all_by_devoll/__pycache__/
 integrations/all_by_devoll/*.pyc
+android/call-coach/node_modules/

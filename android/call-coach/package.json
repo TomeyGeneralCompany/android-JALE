@@ -1,0 +1,10 @@
+{
+  "name": "jale-call-coach-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "bundle": "esbuild sip-entry.js --bundle --minify --legal-comments=inline --outfile=../app/build/generated/call-coach-assets/jale-sip.js"
+  },
+  "dependencies": {"sip.js": "0.21.2"},
+  "devDependencies": {"esbuild": "0.25.12"}
+}

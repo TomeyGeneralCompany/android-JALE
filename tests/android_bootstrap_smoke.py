@@ -67,6 +67,15 @@ with tempfile.TemporaryDirectory() as home:
     assert status == 303, "the county call list must load via the private app server"
     status, _, office = request("/office", session)
     assert status == 200 and b"Copemish" in office and b"Skiera Management" in office
+    import sqlite3
+    with sqlite3.connect(Path(home) / "data" / "tickets.sqlite3") as con:
+        lead_id = con.execute("SELECT id FROM office_accounts WHERE name='Skiera Management'").fetchone()[0]
+    coach_path = f"/office/call-coach/{lead_id}"
+    assert request(coach_path)[0] == 403
+    status, _, coach = request(coach_path, session)
+    assert status == 200 and b"+12315103071" in coach and b"Start live coaching" in coach
+    status, typ, worklet = request("/office/call-assets/pcm.js", session)
+    assert status == 200 and typ == "application/javascript" and b"registerProcessor" in worklet
     status, typ, routes = request("/office/routes.csv", session)
     assert status == 200 and typ.startswith("text/csv") and routes.startswith(b"date,time,route,")
     database = Path(home) / "data" / "tickets.sqlite3"
