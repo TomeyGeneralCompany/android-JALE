@@ -55,6 +55,7 @@ def start(home, token):
     home = str(Path(home).resolve())
     os.environ["HOME"] = home
     os.environ["ABD_DB"] = str(Path(home) / "data" / "tickets.sqlite3")
+    os.environ["JALE_ANDROID"] = "1"
     os.environ["ABD_BIND"] = "127.0.0.1"
     os.environ["ABD_PORT"] = "8765"
     os.environ.pop("ABD_DASHBOARD_PASSWORD", None)
