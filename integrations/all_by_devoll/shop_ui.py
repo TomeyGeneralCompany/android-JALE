@@ -163,14 +163,11 @@ def ticket_page(ticket, con, amounts, estimate_running=False):
         if estimate_running:
             estimate_controls='<p role="status">Estimate running. Reload this job to check the result.</p>'
         else:
-            offline_mode=os.getenv("JALE_ANDROID")=="1" and not os.getenv("ABD_OLLAMA_URL")
-            button_title=("Draft offline diagnostic checklist" if offline_mode
-                          else "Generate labor & diagnostic estimate")
-            estimate_controls=postform('/ticket/'+str(n)+'/suggest',button_title,"action secondary")
+            estimate_controls=postform('/ticket/'+str(n)+'/suggest',
+                                       "Generate labor & diagnostic estimate","action secondary")
             if ai_event and ai_event["event"]=="internal_ai_failed":
                 estimate_controls='<p role="status">The latest estimate failed. Try again.</p>'+estimate_controls
-        assist_heading=("Diagnostic assistance" if os.getenv("JALE_ANDROID")=="1"
-                        and not os.getenv("ABD_OLLAMA_URL") else "AI assistance")
+        assist_heading="Qwen AI assistance" if os.getenv("JALE_ANDROID")=="1" else "AI assistance"
         right+=('<div class="minisection"><h3>'+assist_heading+'</h3>'+estimate_controls+
                 ('<pre class="ai">'+esc(ticket["ai_notes"])+'</pre>' if ticket["ai_notes"] else '')+'</div></section>')
         inner.append('<div class="working">'+left+right+'</div>')
