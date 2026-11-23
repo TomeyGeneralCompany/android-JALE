@@ -1,4 +1,4 @@
-name: El Grande Android APK
+name: JALE Android APK
 
 on:
   pull_request:
@@ -32,10 +32,19 @@ jobs:
           export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           export ANDROID_SDK_ROOT="$ANDROID_HOME"
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+      - name: Cache pinned mobile Qwen model and llama.cpp source
+        uses: actions/cache@v4
+        with:
+          path: |
+            android/third_party/llama.cpp
+            android/app/src/main/assets/Qwen3-0.6B-Q4_K_M.gguf
+          key: jale-qwen3-0.6b-q4km-1208e45-llama-969d733
+      - name: Prepare bundled native Qwen engine and GGUF
+        run: bash android/ci/prepare-qwen.sh
       - name: Check Python syntax
         run: python -m compileall -q integrations/all_by_devoll android/app/src/main/python
       - name: Build offline-capable APK
@@ -44,6 +53,6 @@ jobs:
       - name: Upload APK for website distribution
         uses: actions/upload-artifact@v4
         with:
-          name: el-grande-android-debug-apk
+          name: jale-android-qwen-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
