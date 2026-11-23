@@ -59,6 +59,11 @@ def start(home, token):
     os.environ["ABD_PORT"] = "8765"
     os.environ.pop("ABD_DASHBOARD_PASSWORD", None)
 
+    # Android recreates the Python process on each cold launch. Restore
+    # Gmail/AI settings saved inside the private app data directory.
+    import office_settings
+    office_settings.load_environment()
+
     _android_invoice_adapter(home)
     import desk
 
