@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22.1)
 project(jale_qwen LANGUAGES C CXX)
 
 # The llama.cpp checkout is pinned and downloaded in android/ci/prepare-qwen.sh.
-set(LLAMA_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../third_party/llama.cpp")
+set(LLAMA_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../../third_party/llama.cpp")
 if(NOT EXISTS "${LLAMA_ROOT}/CMakeLists.txt")
     message(FATAL_ERROR "llama.cpp source absent; run android/ci/prepare-qwen.sh")
 endif()
