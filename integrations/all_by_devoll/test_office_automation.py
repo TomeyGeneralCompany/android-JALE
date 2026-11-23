@@ -99,7 +99,8 @@ class OfficeWorkflowTests(unittest.TestCase):
         with self.assertRaises(HTTPError) as premature:
             self.post(f"/ticket/{ticket_id}/finalize", final_total="300")
         self.assertEqual(premature.exception.code, 400)
-        self.post("/office/stop", ticket_id=ticket_id, state="done")
+        self.post("/office/stop", ticket_id=ticket_id, state="done", crew_hours="1", hourly_cents="20",
+                  miles="5", mileage_cents="0.70", disposal_cents="0")
         with self.assertRaises(HTTPError) as invoice:
             self.get(f"/ticket/{ticket_id}/invoice.pdf")
         self.assertEqual(invoice.exception.code, 404)
@@ -141,3 +142,49 @@ class OfficeWorkflowTests(unittest.TestCase):
         page = self.post("/office/estimate", ticket_id="1", labor_hours="2", labor_rate="40", truck="20", disposal="70")
         self.assertIn("Minimum after 15% split: $200.00", page)
         self.assertEqual(self.rows("SELECT status,bill_total,extra_charge FROM tickets"), [("new", "", "0")])
+
+    def test_route_margin_costs_rates_rounding_and_historical_stops(self):
+        self.post("/office/account", name="County Rentals", area="Copemish")
+        self.plan(monthly="300.03")
+        self.plan(monthly="200.03", route="Wellston", site="12 Ranch Rd")
+        self.post("/office/route-rates", hourly_cents="30.00", mileage_cents="0.80", margin_month="2027-02")
+        self.assertIn('name="mileage_cents" type="number" value="0.80"', self.get("/ticket/1"))
+        with self.assertRaises(HTTPError) as missing:
+            self.post("/office/stop", ticket_id="1", state="done")
+        self.assertEqual(missing.exception.code, 400)
+        self.assertEqual(self.rows("SELECT state FROM office_stops WHERE ticket_id=1"), [("scheduled",)])
+
+        actual = dict(crew_hours="1.50", hourly_cents="30", miles="12.50", mileage_cents="0.80",
+                      disposal_cents="20.00", other_cents="5.00")
+        self.post("/office/stop", ticket_id="1", state="done", **actual)
+        self.post("/office/stop", ticket_id="1", state="done", **actual)
+        self.post("/office/route-rates", hourly_cents="35", mileage_cents="0.90")
+        self.assertIn("Recorded direct cost: $80.00", self.get("/ticket/1"))
+        with closing(desk.db()) as con, con:
+            # Simulate a completed stop captured before JALE tracked direct costs.
+            con.execute("UPDATE office_stops SET state='done' WHERE ticket_id=3")
+            by_route, by_account, combined = office.office_margins.report(con, "2027-02-01", "2027-02-28")
+        gross = by_account[1][1]
+        self.assertEqual((gross.gross, gross.parent, gross.costs, gross.margin), (50_006, 7501, 8000, 34_505))
+        self.assertEqual(gross.missing_costs, 1)
+        self.assertEqual(by_route["copemish"][1].costs, 8000)
+        self.assertEqual(combined[("wellston", 1)][2].missing_costs, 1)
+
+        actual["disposal_cents"] = "25.00"
+        with self.assertRaises(HTTPError) as stale:
+            self.post("/office/stop-costs", ticket_id="1", revision="0", **actual)
+        self.assertEqual(stale.exception.code, 400)
+        self.post("/office/stop-costs", ticket_id="1", revision="1", **actual)
+        self.post("/office/stop-costs", ticket_id="1", revision="1", **actual)
+        self.assertEqual(self.rows("SELECT revision FROM office_stop_costs WHERE ticket_id=1"), [(2,)])
+        self.assertEqual(self.rows("SELECT count(*) FROM events WHERE event='route_costs_recorded'"), [(2,)])
+        page = self.get("/office?margin_month=2027-02&margin_view=account")
+        self.assertIn("Completed without costs", page)
+        self.assertIn("$340.05", page)
+        self.current = date(2027, 3, 1)
+        desk.run_office_automation()
+        invoice_id = self.rows("SELECT ticket_id FROM office_invoices")[0][0]
+        self.post("/office/approve-invoice", ticket_id=invoice_id)
+        with closing(desk.db()) as con:
+            _, by_account, _ = office.office_margins.report(con, "2027-02-01", "2027-02-28")
+        self.assertEqual(by_account[1][1].approved_gross, 50_006)

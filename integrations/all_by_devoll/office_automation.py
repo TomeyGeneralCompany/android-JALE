@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 
 import customer_payments
 import job_calendar
+import office_margins
 import stock
 
 DDL = """
@@ -347,6 +348,7 @@ def close_stop(con, data, now):
     if not updated.rowcount:
         return
     if state == "done":
+        office_margins.save_stop_costs(con, ticket_id, data, now)
         con.execute("""UPDATE tickets SET status='completed', bill_total='0.00', finalized_at=?,updated_at=?
                        WHERE id=?""", (now, now, ticket_id))
     else:

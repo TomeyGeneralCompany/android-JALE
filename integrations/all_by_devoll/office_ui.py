@@ -9,6 +9,7 @@ import dashboard_overview
 import customer_payments
 import stock
 import office_automation as office
+import office_margins as margins
 import shop_ui
 from stock_ui import esc, field, form, hidden, list_table, navigation, section
 
@@ -151,9 +152,9 @@ def routes(con, query, current):
     for row in rows:
         actions = ""
         if row["state"] == "scheduled":
-            for state, label in (("done", "Complete stop"), ("skipped", "Skip stop")):
-                actions += form("/office/stop", hidden("ticket_id", row["ticket_id"]) + hidden("state", state) +
-                                hidden("dispatch", start[:7]), label)
+            actions = link(f"/ticket/{row['ticket_id']}#stop-costs", "Complete stop")
+            actions += form("/office/stop", hidden("ticket_id", row["ticket_id"]) + hidden("state", "skipped") +
+                            hidden("dispatch", start[:7]), "Skip stop")
         result.append((esc(row["day"]), esc(row["route"]), esc(row["site"]), esc(row["name"]),
                        esc(row["service"]), job(row["ticket_id"]), esc(row["state"]), actions))
     snow_fields = field("route", "Snow route", required=True)
@@ -225,7 +226,7 @@ def page(con, query, amounts):
     current = office.today()
     account_id = query.get("account", [""])[0]
     toolbar = '<div class="footactions">' + link("#routes", "Routes") + link("#billing", "Revenue and billing")
-    toolbar += " " + link("/office/routes.csv", "Export upcoming routes") + '</div>'
+    toolbar += " " + link("#margins", "Route margins") + " " + link("/office/routes.csv", "Export upcoming routes") + '</div>'
     if os.getenv("JALE_ANDROID") == "1":
         shared = con.execute("SELECT value FROM office_preferences WHERE name='shared_desk'").fetchone()
         url = shared[0] if shared else ""
@@ -240,7 +241,7 @@ def page(con, query, amounts):
     if account_id:
         content += account_panel(con, office.account(con, stock.identifier(account_id)), current)
     return shop_ui.page_shell(content + sales(con, query, current) + intake(con) +
-                             routes(con, query, current) + billing(con, query, current, amounts))
+                             routes(con, query, current) + billing(con, query, current, amounts) + margin_report(con, query, current))
 
 
 def ticket_panel(con, ticket):
@@ -249,9 +250,8 @@ def ticket_panel(con, ticket):
     key = hidden("ticket_id", ticket_id)
     if kind == "stop":
         stop = con.execute("SELECT day,state FROM office_stops WHERE ticket_id=?", (ticket_id,)).fetchone()
-        controls = ""
+        controls = stop_cost_form(con, ticket_id, stop["state"])
         if stop["state"] == "scheduled":
-            controls = form("/office/stop", key + hidden("state", "done"), "Complete stop")
             controls += form("/office/stop", key + hidden("state", "skipped"), "Skip stop")
         return section("Contracted stop", '<p>' + esc(stop["day"]) + ' · ' + esc(stop["state"].title()) +
                        '. Covered by the monthly agreement.</p>' + controls), True
@@ -304,3 +304,60 @@ def route_csv(con, current):
         safe = [("'" + v if v.lstrip().startswith(("=", "+", "-", "@")) else v) for v in tuple(row)[:-1]]
         writer.writerow(safe + [f"ABD-{row['ticket_id']:06d}"])
     return output.getvalue()
+
+
+def cost_input(name, label, units):
+    value = office.money(units) if units is not None else ""
+    return field(name, label, value, "number", step=".01", required=name != "other_cents")
+
+
+def stop_cost_form(con, ticket_id, state):
+    costs = margins.get_costs(con, ticket_id)
+    defaults = margins.defaults(con)
+    fields = hidden("ticket_id", ticket_id) + hidden("revision", costs["revision"] if costs else 0)
+    for name, label, _ in margins.FIELDS:
+        value = costs[name] if costs else defaults.get(name)
+        fields += cost_input(name, label, value)
+    hint = "<p>Enter total crew hours and this stop’s share of route mileage. Enter zero for costs that do not apply.</p>"
+    if costs:
+        hint += "<p>Recorded direct cost: $" + office.money(sum(margins.cost_parts(costs))) + "</p>"
+    if state == "scheduled":
+        controls = form("/office/stop", fields + hidden("state", "done"), "Complete stop and record costs")
+        return '<div id="stop-costs">' + hint + controls + '</div>'
+    return ('<details id="stop-costs" open><summary>' + ("Review or correct actual costs" if costs else "Record actual costs") +
+            '</summary>' + hint + form("/office/stop-costs", fields, "Save actual costs") + '</details>')
+
+
+def margin_report(con, query, current):
+    selected = office.parse_month(query.get("margin_month", [""])[0], current)
+    first, last = office.active_month(selected)
+    by_route, by_account, combined = margins.report(con, first, last)
+    view = query.get("margin_view", ["route"])[0]
+    choices = (("route", "By route"), ("account", "By account"), ("combined", "By route and account"))
+    if view == "account":
+        groups = [(name, data) for name, data in by_account.values()]
+    elif view == "combined":
+        groups = [(f"{route} · {name}", data) for route, name, data in combined.values()]
+    else:
+        groups = list(by_route.values())
+    groups.sort(key=lambda group: group[0].casefold())
+    rows = []
+    for label, total in groups:
+        amounts = (total.gross, total.approved_gross, total.parent, total.labor, total.vehicle,
+                   total.disposal, total.other, total.costs)
+        cells = tuple("$" + office.money(value) for value in amounts)
+        margin = ("-$" if total.margin < 0 else "$") + office.money(abs(total.margin))
+        rows.append((esc(label), *cells, margin, str(total.open_stops), str(total.missing_costs)))
+    filter_form = '<form method="get" action="/office#margins">' + field("margin_month", "Service month", first[:7], "month")
+    filter_form += select("margin_view", "Group by", choices, view) + shop_ui.button("Show margins") + '</form>'
+    defaults = margins.defaults(con)
+    settings = hidden("margin_month", first[:7]) + "".join(cost_input(name, label, defaults.get(name))
+        for name, label, _ in margins.FIELDS if name in margins.RATES)
+    return ('<section class="panel" id="margins"><h2>Route margins</h2>' + filter_form +
+            '<p>Margin after recorded costs equals agreement charges less Tomey General’s 15% and direct stop costs. '
+            'Open stops or completed stops missing costs can reduce the margin shown.</p>' +
+            list_table(("Route / account", "Agreement charges", "Approved invoices", "Tomey General 15%",
+                        "Labor", "Vehicle", "Disposal", "Other", "Recorded costs",
+                        "Margin after recorded costs", "Open stops", "Completed without costs"), rows) +
+            '<details><summary>Default labor and mileage rates</summary>' +
+            form("/office/route-rates", settings, "Save cost rates") + '</details></section>')

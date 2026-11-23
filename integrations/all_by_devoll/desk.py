@@ -35,6 +35,7 @@ import job_calendar
 import shop_ui
 import office_automation
 import office_leads
+import office_margins
 import office_settings
 import office_ui
 import customer_payments
@@ -132,7 +133,7 @@ def init():
     with closing(db()) as con, con:
         con.execute("PRAGMA journal_mode=WAL")
         con.executescript(SCHEMA + stock.DDL + parts.DDL + job_reports.DDL + job_calendar.DDL +
-                          work_orders.DDL + customer_payments.DDL + office_automation.DDL)
+                          work_orders.DDL + customer_payments.DDL + office_automation.DDL + office_margins.DDL)
         for ticket in con.execute("""SELECT id,phone FROM tickets t WHERE status IN ('new','estimating','quoted')
             AND finalized_at IS NULL AND NOT EXISTS (SELECT 1 FROM office_intake i WHERE i.ticket_id=t.id)
             AND (source_id LIKE 'manual:%' OR source_id LIKE 'email:%' OR source_id LIKE 'imap:%')"""):
@@ -1007,6 +1008,14 @@ def apply_office_action(con, path, data):
         if data.get("dispatch"):
             return "/office?" + urlencode({"dispatch": data["dispatch"]}) + "#routes"
         return f"/ticket/{stock.identifier(data['ticket_id'])}"
+    if path == "/office/stop-costs":
+        ticket_id = stock.identifier(data.get("ticket_id", ""))
+        office_margins.amend_stop_costs(con, ticket_id, data, now)
+        return f"/ticket/{ticket_id}"
+    if path == "/office/route-rates":
+        office_margins.save_defaults(con, data)
+        month = office.parse_month(data.get("margin_month", ""), current).isoformat()[:7]
+        return "/office?" + urlencode({"margin_month": month}) + "#margins"
     if path == "/office/approve-invoice":
         return f"/ticket/{office.approve_invoice(con, data, now)}"
     if path == "/office/link":
