@@ -54,6 +54,7 @@ IMAP_FOLDER = os.getenv("ABD_IMAP_FOLDER", "INBOX")
 POLL_SECONDS = max(30, int(os.getenv("ABD_POLL_SECONDS", "120")))
 OLLAMA_URL = os.getenv("ABD_OLLAMA_URL", "http://127.0.0.1:11434/api/generate")
 OLLAMA_MODEL = os.getenv("ABD_OLLAMA_MODEL", "qwen3:4b")
+mailbox_lock = threading.Lock()
 estimate_lock = threading.Lock()
 estimate_ticket = None
 CENT = Decimal("0.01")
@@ -221,14 +222,21 @@ def parse_request(msg):
     return fields,(plain or markup)[:15000]
 
 def import_mailbox_once():
+    # Serialize foreground sync with the background poller so the same
+    # mailbox UID cannot create duplicate work when both are running.
+    with mailbox_lock:
+        return _import_mailbox_locked()
+
+
+def _import_mailbox_locked():
     mailbox_user=os.getenv("ABD_IMAP_USER","")
     mailbox_secret=os.getenv("ABD_IMAP_APP_PASSWORD","")
     if not (mailbox_user and mailbox_secret):
         return 0
     count=0
-    conn=imaplib.IMAP4_SSL(IMAP_HOST)
+    conn=imaplib.IMAP4_SSL(IMAP_HOST,timeout=25)
     try:
-        conn.login(mailbox_user, mailbox_secret)
+        conn.login(mailbox_user, mailbox_secret.replace(' ', ''))
         result,_=conn.select(IMAP_FOLDER,readonly=True)
         if result!="OK":raise RuntimeError("Cannot select mailbox")
         result,data=conn.uid("search",None,"ALL")
@@ -248,8 +256,14 @@ def import_mailbox_once():
             if not raw:continue
             msg=email.message_from_bytes(raw)
             subject=str(make_header(decode_header(msg.get("Subject","")))).lower()
-            if "all by devoll" in subject and "service request" in subject:
-                fields,body=parse_request(msg)
+            # The website form provider can use changing subjects. Accept
+            # recognizable structured tickets, not arbitrary emails or spam.
+            fields,body=parse_request(msg)
+            evidence=sum(bool(fields.get(k)) for k in ("customer","phone","location",
+                                                       "service","machine","problem"))
+            ticket_subject=("service request" in subject or "new submission" in subject
+                            or "new ticket" in subject or "appointment request" in subject)
+            if evidence >= 2 and (ticket_subject or evidence >= 3):
                 if fields.get("phone") or fields.get("problem") or fields.get("machine"):
                     message_id=msg.get("Message-ID","").strip()
                     source_id="email:"+message_id if message_id else marker
@@ -857,6 +871,15 @@ class Handler(BaseHTTPRequestHandler):
                 except (OSError,imaplib.IMAP4.error,ValueError):
                     return self.redirect("/settings?status=failed")
                 return self.redirect("/settings?status=connected")
+            if path=="/settings/sync-gmail":
+                try:
+                    if not (os.getenv("ABD_IMAP_USER") and os.getenv("ABD_IMAP_APP_PASSWORD")):
+                        raise ValueError("Save Gmail credentials before syncing")
+                    imported=import_mailbox_once()
+                except (OSError,imaplib.IMAP4.error,ValueError,RuntimeError):
+                    log.exception("Manual Gmail import failed")
+                    return self.redirect("/settings?status=sync-failed")
+                return self.redirect("/settings?status=imported-"+str(imported))
             if path=="/parts/import":
                 count=import_parts(data.get("catalog",""),"operator supplier CSV")
                 self.send_response(303);self.send_header("Location","/#parts");self.end_headers();return
