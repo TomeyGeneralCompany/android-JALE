@@ -113,18 +113,23 @@ public class JaleSmokeTest {
             assertEquals("Offline diagnostic request should be accepted", 303, draft.getResponseCode());
             draft.disconnect();
             boolean drafted = false;
-            for (int tries = 0; tries < 1500; tries++) {
+            String lastTicketPage = "";
+            for (int tries = 0; tries < 200; tries++) {
                 HttpURLConnection ticket = connect(jobUrl, "GET");
                 if (ticket.getResponseCode() == 200) {
                     String page = read(ticket);
+                    lastTicketPage = page;
                     if (page.contains("INTERNAL PRELIMINARY ESTIMATE") || page.contains("Unstructured AI response")) {
                         drafted = true;
                         break;
                     }
                 } else ticket.disconnect();
-                Thread.sleep(200);
+                // Repeated HTML rendering competes with model inference on CPU.
+                Thread.sleep(3000);
             }
-            assertTrue("Phone must complete genuine local Qwen inference", drafted);
+            assertTrue("Phone must complete genuine local Qwen inference; model-extracted="+
+                    QwenNative.modelReady()+", last-page="+
+                    lastTicketPage.substring(0, Math.min(150, lastTicketPage.length())), drafted);
             assertTrue("Real job is persisted in dashboard", awaitDashboard().contains(customer));
         }
         try (ActivityScenario<MainActivity> reopened = ActivityScenario.launch(MainActivity.class)) {
