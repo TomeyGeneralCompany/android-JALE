@@ -84,9 +84,11 @@ public class MainActivity extends Activity {
         });
         web.setDownloadListener((url, userAgent, disposition, mime, length) -> {
             if (url.startsWith(ROOT + "/") && ("application/pdf".equals(mime) || url.endsWith(".pdf"))) {
-                shareInvoice(url);
+                shareLocalFile(url, "application/pdf", "el-grande-", ".pdf", "Share customer invoice");
+            } else if ((ROOT + "/office/routes.csv").equals(url)) {
+                shareLocalFile(url, "text/csv", "jale-routes-", ".csv", "Share route schedule");
             } else {
-                Toast.makeText(this, "Only local invoice PDF downloads are supported", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "This download is unavailable in JALE", Toast.LENGTH_LONG).show();
             }
         });
         new Thread(() -> {
@@ -139,7 +141,7 @@ public class MainActivity extends Activity {
         pollReady(tries + 1, loading);
     }
 
-    private void shareInvoice(String url) {
+    private void shareLocalFile(String url, String mime, String prefix, String suffix, String title) {
         new Thread(() -> {
             try {
                 HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
@@ -149,7 +151,7 @@ public class MainActivity extends Activity {
                 if (conn.getResponseCode() != 200) throw new IllegalStateException("Invoice request failed");
                 File dir = new File(getCacheDir(), "invoices");
                 if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("Cannot create invoice cache");
-                File out = File.createTempFile("el-grande-", ".pdf", dir);
+                File out = File.createTempFile(prefix, suffix, dir);
                 try (InputStream in = conn.getInputStream(); FileOutputStream target = new FileOutputStream(out)) {
                     byte[] buffer = new byte[8192];
                     int n;
@@ -157,12 +159,12 @@ public class MainActivity extends Activity {
                 } finally { conn.disconnect(); }
                 Uri shareUri = FileProvider.getUriForFile(this, getPackageName() + ".files", out);
                 Intent send = new Intent(Intent.ACTION_SEND);
-                send.setType("application/pdf");
+                send.setType(mime);
                 send.putExtra(Intent.EXTRA_STREAM, shareUri);
                 send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                ui.post(() -> startActivity(Intent.createChooser(send, "Share customer invoice")));
+                ui.post(() -> startActivity(Intent.createChooser(send, title)));
             } catch (Exception error) {
-                ui.post(() -> Toast.makeText(this, "Invoice export failed: " + error.getMessage(),
+                ui.post(() -> Toast.makeText(this, "Export failed: " + error.getMessage(),
                         Toast.LENGTH_LONG).show());
             }
         }, "invoice-share").start();

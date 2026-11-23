@@ -33,7 +33,10 @@ import work_orders
 import job_reports
 import job_calendar
 import shop_ui
+import office_automation
+import office_leads
 import office_settings
+import office_ui
 import customer_payments
 import bank_ledger
 import bank_ui
@@ -47,6 +50,7 @@ DB = Path(os.getenv("ABD_DB", str(ROOT / "data" / "tickets.sqlite3")))
 BIND = os.getenv("ABD_BIND", "127.0.0.1")
 PORT = int(os.getenv("ABD_PORT", "8765"))
 PASSWORD = os.getenv("ABD_DASHBOARD_PASSWORD", "")
+PUBLIC_ORIGIN = office_automation.shared_origin(os.getenv("ABD_PUBLIC_ORIGIN", ""))
 IMAP_USER = os.getenv("ABD_IMAP_USER", "")
 IMAP_PASSWORD = os.getenv("ABD_IMAP_APP_PASSWORD", "")
 IMAP_HOST = os.getenv("ABD_IMAP_HOST", "imap.gmail.com")
@@ -128,7 +132,11 @@ def init():
     with closing(db()) as con, con:
         con.execute("PRAGMA journal_mode=WAL")
         con.executescript(SCHEMA + stock.DDL + parts.DDL + job_reports.DDL + job_calendar.DDL +
-                          work_orders.DDL + customer_payments.DDL)
+                          work_orders.DDL + customer_payments.DDL + office_automation.DDL)
+        for ticket in con.execute("""SELECT id,phone FROM tickets t WHERE status IN ('new','estimating','quoted')
+            AND finalized_at IS NULL AND NOT EXISTS (SELECT 1 FROM office_intake i WHERE i.ticket_id=t.id)
+            AND (source_id LIKE 'manual:%' OR source_id LIKE 'email:%' OR source_id LIKE 'imap:%')"""):
+            office_automation.link_intake(con, ticket['id'], ticket['phone'])
         bank_ledger.init(con)
 
 
@@ -165,7 +173,8 @@ def create_ticket(payload, source_id, raw=""):
     clean = {k:str(payload.get(k, "") or "").strip()[:4000] for k in FIELDS}
     now = utc()
     default_labor_rate=str(cash(os.getenv("ABD_DEFAULT_LABOR_RATE","0")))
-    with db() as con:
+    with closing(db()) as con, con:
+        con.execute("BEGIN IMMEDIATE")
         row = con.execute("SELECT id FROM tickets WHERE source_id=?", (source_id,)).fetchone()
         if row: return row["id"], False
         cur = con.execute("""INSERT INTO tickets
@@ -173,6 +182,7 @@ def create_ticket(payload, source_id, raw=""):
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (source_id,now,*(clean[k] for k in FIELDS),raw[:15000],default_labor_rate,now))
         con.execute("INSERT INTO events(ticket_id,timestamp,event) VALUES(?,?,'received')",(cur.lastrowid,now))
+        office_automation.link_intake(con, cur.lastrowid, clean["phone"])
         return cur.lastrowid,True
 
 class TableReader(HTMLParser):
@@ -288,7 +298,10 @@ def poller():
         time.sleep(POLL_SECONDS)
 
 def update_ticket(ticket_id,data):
-    with db() as con:
+    with closing(db()) as con, con:
+        con.execute("BEGIN IMMEDIATE")
+        if office_automation.protected_kind(con, ticket_id):
+            raise ValueError("Manage this scheduled stop or invoice in Office automation.")
         before=con.execute("SELECT * FROM tickets WHERE id=?", (ticket_id,)).fetchone()
         if before is None:raise LookupError("Ticket not found")
         if before["finalized_at"]:raise ValueError("Finalized bills are locked; record a documented correction separately")
@@ -312,6 +325,8 @@ def finalize_ticket(ticket_id,final_total):
     final=cash(final_total)
     with closing(db()) as con, con:
         con.execute("BEGIN IMMEDIATE")
+        if office_automation.protected_kind(con, ticket_id):
+            raise ValueError("Manage this scheduled stop or invoice in Office automation.")
         row=con.execute("SELECT * FROM tickets WHERE id=?",(ticket_id,)).fetchone()
         if not row:raise LookupError("Ticket not found")
         if row["finalized_at"]:raise ValueError("Already finalized")
@@ -327,6 +342,8 @@ def finish_job(ticket_id,data):
     final=cash(record["actual_invoice"])
     with closing(db()) as con, con:
         con.execute("BEGIN IMMEDIATE")
+        if office_automation.protected_kind(con, ticket_id):
+            raise ValueError("Manage this scheduled stop or invoice in Office automation.")
         row=con.execute("SELECT * FROM tickets WHERE id=?",(ticket_id,)).fetchone()
         if row is None:raise LookupError("Ticket not found")
         if row["finalized_at"]:raise ValueError("Job already finalized")
@@ -594,12 +611,15 @@ def render_ticket(ticket_id):
             return None
         with estimate_lock:
             running = estimate_ticket == ticket_id
-        return shop_ui.ticket_page(ticket, con, amounts, running)
+        panel, dedicated = office_ui.ticket_panel(con, ticket)
+        return shop_ui.ticket_page(ticket, con, amounts, running, panel, dedicated)
 
 
 class Handler(BaseHTTPRequestHandler):
-    def response_headers(self,code=200,typ="text/html; charset=utf-8",csp=None):
+    def response_headers(self,code=200,typ="text/html; charset=utf-8",csp=None,filename=None):
         self.send_response(code);self.send_header("Content-Type",typ)
+        if filename:
+            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
         self.send_header("Cache-Control","no-store");self.send_header("X-Content-Type-Options","nosniff")
         self.send_header("Content-Security-Policy",csp or "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
         self.send_header("X-Frame-Options","DENY");self.end_headers()
@@ -646,6 +666,18 @@ class Handler(BaseHTTPRequestHandler):
             if page is not None:
                 return self.response_text(page)
             return self.response_text("Job not found",404,"text/plain")
+        if path in ("/office", "/office/routes.csv"):
+            try:
+                with closing(db()) as con, con:
+                    con.execute("BEGIN")
+                    if path.endswith(".csv"):
+                        content = office_ui.route_csv(con, office_automation.today())
+                        self.response_headers(typ="text/csv; charset=utf-8", filename="jale-routes.csv")
+                        self.wfile.write(content.encode("utf-8"))
+                        return
+                    return self.response_text(office_ui.page(con, parse_qs(urlsplit(self.path).query), amounts))
+            except (ValueError, LookupError) as err:
+                return self.response_text(str(err), 400, "text/plain")
         if path == "/work-orders":
             try:
                 with closing(db()) as con:
@@ -742,7 +774,8 @@ class Handler(BaseHTTPRequestHandler):
             ticket_id=int(match.group(1))
             with db() as con:
                 ticket=con.execute("SELECT * FROM tickets WHERE id=?",(ticket_id,)).fetchone()
-                if ticket is None:return self.response_text("Invoice not found",404,"text/plain")
+                if ticket is None or office_automation.protected_kind(con, ticket_id) == "stop":
+                    return self.response_text("Invoice not found",404,"text/plain")
                 if not ticket["finalized_at"]:return self.response_text("Job is not complete",409,"text/plain")
                 completed=con.execute("SELECT * FROM job_completions WHERE ticket_id=?",(ticket_id,)).fetchone()
             path_pdf=invoice_pdf.create(ticket,completed)
@@ -786,10 +819,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.auth():return
         origin=self.headers.get("Origin")
-        if urlsplit(self.path).path.startswith(("/bank/", "/inventory/", "/purchases/", "/work-orders/")) and not origin:
+        if urlsplit(self.path).path.startswith(("/bank/", "/inventory/", "/purchases/", "/work-orders/", "/office/")) and not origin:
             return self.response_text("Same-origin action required",403,"text/plain")
         if origin:
-            expected=f"http://{self.headers.get('Host')}"
+            expected=PUBLIC_ORIGIN or f"http://{self.headers.get('Host')}"
             if origin!=expected:return self.response_text("Invalid origin",403,"text/plain")
         size=int(self.headers.get("Content-Length","0") or 0)
         if size>25000:return self.response_text("Request too large",413,"text/plain")
@@ -798,6 +831,13 @@ class Handler(BaseHTTPRequestHandler):
         data={k:v[0] for k,v in parse_qs(self.rfile.read(size).decode("utf-8",errors="replace"),keep_blank_values=True).items()}
         path=urlsplit(self.path).path
         try:
+            if path.startswith("/office/"):
+                with closing(db()) as con, con:
+                    con.execute("BEGIN IMMEDIATE")
+                    target = apply_office_action(con, path, data)
+                if target is None:
+                    return self.response_text("Not found",404,"text/plain")
+                return self.redirect(target)
             if path == "/work-orders/save":
                 with closing(db()) as con, con:
                     con.execute("BEGIN IMMEDIATE")
@@ -838,7 +878,10 @@ class Handler(BaseHTTPRequestHandler):
                 ticket_id = int(data.get("ticket_id", ""))
                 if not 0 < ticket_id <= 2**63 - 1:
                     raise ValueError("Choose a valid job.")
-                with db() as con:
+                with closing(db()) as con, con:
+                    con.execute("BEGIN IMMEDIATE")
+                    if office_automation.protected_kind(con, ticket_id):
+                        raise ValueError("Manage contracted stops in Office automation.")
                     if path == "/appointments/save":
                         day = job_calendar.schedule(con, ticket_id, data.get("date", ""), data.get("time", ""))
                         month = day.isoformat()[:7]
@@ -914,6 +957,10 @@ class Handler(BaseHTTPRequestHandler):
                 if action=="update":update_ticket(ident_id,data)
                 if action=="finalize":finalize_ticket(ident_id,data.get("final_total",""))
                 if action=="complete":finish_job(ident_id,data)
+                if action in ("suggest", "part"):
+                    with closing(db()) as con:
+                        if office_automation.protected_kind(con, ident_id):
+                            raise ValueError("This action applies to one-off jobs only.")
                 if action=="suggest":start_estimate(ident_id)
                 if action=="payment":record_customer_payment(ident_id,data)
                 if action=="pay-in-full":pay_invoice_in_full(ident_id)
@@ -932,12 +979,72 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
     def log_message(self,fmt,*args):log.info("%s - %s",self.address_string(),fmt%args)
 
+def apply_office_action(con, path, data):
+    now = utc()
+    current = office_automation.today()
+    office = office_automation
+    if path == "/office/shared" and os.getenv("JALE_ANDROID") == "1":
+        office.save_shared_desk(con, data.get("url", ""))
+        return "/office"
+    if path in ("/office/account", "/office/account-edit"):
+        account_id = office.save_account(con, data, update=path.endswith("-edit"))
+        return f"/office?account={account_id}#account"
+    if path in ("/office/seed", "/office/import"):
+        office.import_leads(con, office_leads.CSV if path.endswith("/seed") else data.get("csv", ""))
+        return "/office"
+    if path == "/office/call":
+        office.log_call(con, data, now, current)
+        return "/office?" + urlencode({"account": data["account_id"]}) + "#account"
+    if path in ("/office/plan", "/office/end-plan"):
+        account_id = office.add_plan(con, data, current) if path.endswith("/plan") else office.end_plan(con, data, now, current)
+        office.generate_stops(con, now, current)
+        return f"/office?account={account_id}#account"
+    if path == "/office/snow":
+        office.dispatch_snow(con, data, now, current)
+        return "/office#routes"
+    if path == "/office/stop":
+        office.close_stop(con, data, now)
+        if data.get("dispatch"):
+            return "/office?" + urlencode({"dispatch": data["dispatch"]}) + "#routes"
+        return f"/ticket/{stock.identifier(data['ticket_id'])}"
+    if path == "/office/approve-invoice":
+        return f"/ticket/{office.approve_invoice(con, data, now)}"
+    if path == "/office/link":
+        office.set_intake_account(con, data)
+        return f"/ticket/{stock.identifier(data['ticket_id'])}"
+    if path == "/office/intake-details":
+        return f"/ticket/{office.update_intake(con, data, now)}"
+    if path == "/office/estimate":
+        ticket_id, _ = office.draft_estimate(con, data, now)
+        return f"/ticket/{ticket_id}"
+    return None
+
+
+def run_office_automation():
+    with closing(db()) as con, con:
+        con.execute("BEGIN IMMEDIATE")
+        office_automation.run(con, utc())
+
+
+def office_poller():
+    while True:
+        time.sleep(60)
+        try:
+            run_office_automation()
+        except Exception:
+            log.exception("Office schedule and billing update failed")
+
+
 def main():
     init()
     if BIND not in ("127.0.0.1","::1","localhost") and os.getenv("ABD_ALLOW_REMOTE")!="yes":
         raise SystemExit("Refusing remote bind; use a TLS/authenticated reverse proxy and ABD_ALLOW_REMOTE=yes")
     if BIND not in ("127.0.0.1","::1","localhost") and not PASSWORD:
         raise SystemExit("Remote dashboard access requires ABD_DASHBOARD_PASSWORD.")
+    if PUBLIC_ORIGIN and not PASSWORD:
+        raise SystemExit("A shared HTTPS desk requires ABD_DASHBOARD_PASSWORD.")
+    run_office_automation()
+    threading.Thread(target=office_poller,daemon=True).start()
     if not PASSWORD:
         log.info("Local-only mode: no dashboard password required; browser access restricted to localhost.")
     # Always run lightweight pollers so connecting Gmail later via Settings

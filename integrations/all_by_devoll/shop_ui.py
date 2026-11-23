@@ -111,7 +111,7 @@ def job_heading(ticket):
                '</div></div>')
 
 
-def ticket_page(ticket, con, amounts, estimate_running=False):
+def ticket_page(ticket, con, amounts, estimate_running=False, office_panel="", dedicated=False):
     n=int(ticket["id"])
     a=amounts(ticket)
     done=bool(ticket["finalized_at"])
@@ -128,7 +128,11 @@ def ticket_page(ticket, con, amounts, estimate_running=False):
     info="".join('<div><span>'+label+'</span><b>'+esc(value or "Not supplied")+'</b></div>' for label,value in
                  (("Phone",ticket["phone"]),("Location",ticket["location"]),("Equipment",ticket["machine"]),("Reported problem",ticket["problem"])))
     jobinfo='<div class="jobinfo">'+info+'</div>'
-    inner=[]
+    inner=[office_panel]
+    if dedicated:
+        return page_shell('<section class="panel"><h2>Job details</h2>'
+                          '<a href="/office" class="action secondary">Back to office</a>' +
+                          job_heading(ticket) + jobinfo + office_panel + '</section>')
     if not done:
         option=''.join('<option value="'+esc(s)+'"'+(' selected' if status==s else '')+'>'+esc(state_name(s))+'</option>'
                        for s in ("new","estimating","quoted","approved","in_progress","completed","cancelled"))
@@ -265,6 +269,7 @@ def page_shell(content):
 <a href="/inventory">Inventory</a>
 <a href="/purchases">Purchase orders</a>
 <a href="/work-orders">Work orders</a>
+<a href="/office">Office automation</a>
 <a href="/#jobs">♙ &nbsp;Customers</a>
 <a href="/#jobs">▤ &nbsp;Invoices</a>
 <a href="/bank">$ &nbsp;Money &amp; Banks</a>

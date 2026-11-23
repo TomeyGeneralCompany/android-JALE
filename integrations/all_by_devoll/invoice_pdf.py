@@ -58,7 +58,10 @@ def render(ticket,completed,out):
     c.drawString(43,y,"COMPLETED WORK");y-=28
     description=(completed["work_performed"] if completed is not None else
                  ticket["notes"] or "Service as recorded on the job ticket")
-    for paragraph in (ticket["service"] or "Repair service",ticket["problem"],description):
+    paragraphs = (description,)
+    if "source_id" in ticket.keys() and ticket["source_id"].startswith("office:invoice:"):
+        paragraphs = description.splitlines()
+    for paragraph in (ticket["service"] or "Repair service", ticket["problem"], *paragraphs):
         if not paragraph:continue
         for line in simpleSplit(clean(paragraph,1800),"Helvetica",10,width-100):
             if y<145:c.showPage();y=height-65

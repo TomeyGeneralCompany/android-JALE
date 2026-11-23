@@ -60,6 +60,15 @@ with tempfile.TemporaryDirectory() as home:
     assert status == 303, f"Cannot create local job: {status}"
     status, _, page = request("/", session)
     assert status == 200 and customer.encode() in page, "Created local job must appear on dashboard"
+    assert request("/office")[0] == 403, "the sales and contract desk requires the private app session"
+    status, _, office = request("/office", session)
+    assert status == 200 and b"Office automation" in office and b"Forecast gap to $20,000" in office
+    status, _, _ = request("/office/seed", session, "")
+    assert status == 303, "the county call list must load via the private app server"
+    status, _, office = request("/office", session)
+    assert status == 200 and b"Copemish" in office and b"Skiera Management" in office
+    status, typ, routes = request("/office/routes.csv", session)
+    assert status == 200 and typ.startswith("text/csv") and routes.startswith(b"date,time,route,")
     database = Path(home) / "data" / "tickets.sqlite3"
     assert database.is_file(), "SQLite database not persisted"
-    print("PASS: real Android Python bootstrap, authenticated loopback, JALE dashboard, logo, job and SQLite")
+    print("PASS: real Android Python bootstrap, authenticated loopback, JALE dashboard, logo, job, office automation and SQLite")
