@@ -144,7 +144,7 @@ def page(settings,status):
         bank_display+=(" •••• "+escape(settings["ABD_BANK_LAST4"]))
     page_html = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Settings | All by Devoll</title>
+<title>Settings | JALE</title>
 <style>
 :root{color-scheme:light}
 *{box-sizing:border-box}body{margin:0;background:#f5f7f6;color:#193634;font:15px/1.5 system-ui,sans-serif}
@@ -161,7 +161,7 @@ border-radius:9px;color:white;font-weight:700;list-style:none;display:inline-blo
 .details summary:focus-visible{outline:3px solid #e3ac40;outline-offset:3px}
 .details[open] summary{margin-bottom:14px}.hint{font-size:13px;color:#647876}
 </style></head><body>
-<header>ALL BY DEVOLL</header><main><a href="/">← Back to jobs</a><h1>Settings</h1>""" + (
+<header>JALE · TOMEY GENERAL COMPANY</header><main><a href="/">← Back to jobs</a><h1>Settings</h1>""" + (
         '<p class="notice">'+escape(status_text)+'</p>' if status_text else ""
     )+"""
 <section><h2>Business Gmail</h2>
@@ -179,8 +179,8 @@ border-radius:9px;color:white;font-weight:700;list-style:none;display:inline-blo
 <section><h2>Diagnostic AI</h2>
 <p class="muted">Offline diagnostics work on this phone. Optional: connect to an Ollama model on another device for generated AI estimates.</p>
 <form method="post" action="/settings/save">
-<label>Ollama API URL<input name="ABD_OLLAMA_URL" type="url" placeholder="http://192.168.1.10:11434/api/generate" value=\\"""+escape(settings.get("ABD_OLLAMA_URL",""))+"""\\"></label>
-<label>Model<input name="ABD_OLLAMA_MODEL" value=\\"""+escape(settings.get("ABD_OLLAMA_MODEL","qwen3:4b"))+"""\\"></label>
+<label>Ollama API URL<input name="ABD_OLLAMA_URL" type="url" placeholder="http://192.168.1.10:11434/api/generate" value=\""""+escape(settings.get("ABD_OLLAMA_URL",""))+""""></label>
+<label>Model<input name="ABD_OLLAMA_MODEL" value=\""""+escape(settings.get("ABD_OLLAMA_MODEL","qwen3:4b"))+""""></label>
 <button type="submit">Save AI connection</button></form>
 </section>
 <section><h2>Bank account</h2>
