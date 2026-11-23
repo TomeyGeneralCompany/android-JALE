@@ -1,6 +1,6 @@
 """Single-app office settings, stored locally with strict file permissions.
 
-Gmail credentials and bank display details stay on the workstation.
+Gmail credentials and bank display details stay on the device.
 """
 import html
 import imaplib
@@ -10,7 +10,7 @@ import re
 import tempfile
 
 HOME_CONFIG=Path.home()/".config"/"el-grande"/"desk.env"
-EDITABLE=("ABD_OWNER_REPORT_TO","ABD_IMAP_USER","ABD_IMAP_APP_PASSWORD",
+EDITABLE=("ABD_OWNER_REPORT_TO","ABD_IMAP_USER","ABD_IMAP_APP_PASSWORD","ABD_OLLAMA_URL","ABD_OLLAMA_MODEL",
           "ABD_BANK_NAME","ABD_BANK_LABEL","ABD_BANK_LAST4")
 DEFAULT_OWNER="isaiztomey7@gmail.com"
 DEFAULT_BUSINESS="allbydevoll@gmail.com"
@@ -24,6 +24,22 @@ def existing():
                 values[key]=value
     return values
 
+def load_environment():
+    """Load the device's existing private settings at each application start.
+
+    Settings are saved on disk, but Android recreates Python process state
+    whenever the user relaunches the app. Do not lose Gmail connectivity.
+    """
+    saved = existing()
+    for key in ("ABD_OWNER_REPORT_TO", "ABD_IMAP_USER", "ABD_IMAP_APP_PASSWORD",
+                "ABD_REPORT_SMTP_USER", "ABD_REPORT_SMTP_APP_PASSWORD",
+                "ABD_BANK_NAME", "ABD_BANK_LABEL", "ABD_BANK_LAST4",
+                "ABD_OLLAMA_URL", "ABD_OLLAMA_MODEL"):
+        if key in saved:
+            os.environ[key] = saved[key]
+    return saved
+
+
 def save(payload):
     """Update email fields while preserving other settings in the protected service file."""
     old=existing()
@@ -33,6 +49,12 @@ def save(payload):
         v=str(payload[key]).strip()
         if key=="ABD_IMAP_APP_PASSWORD":
             v=v.replace(" ","") if v else old.get(key,"")
+        elif key=="ABD_OLLAMA_URL":
+            if v and not re.fullmatch(r"https?://[^\\s/]+(?::[0-9]{1,5})?/api/generate", v):
+                raise ValueError("Use an Ollama URL ending in /api/generate")
+        elif key=="ABD_OLLAMA_MODEL":
+            if v and not re.fullmatch(r"[a-zA-Z0-9_./:-]{1,100}",v):
+                raise ValueError("Invalid model name")
         elif key=="ABD_BANK_LAST4":
             if v and not re.fullmatch(r"[0-9]{4}",v):
                 raise ValueError("Enter only the last four account digits")
@@ -72,7 +94,8 @@ def save(payload):
         if os.path.exists(tmp):os.unlink(tmp)
     for key in ("ABD_OWNER_REPORT_TO","ABD_IMAP_USER","ABD_IMAP_APP_PASSWORD",
                 "ABD_REPORT_SMTP_USER","ABD_REPORT_SMTP_APP_PASSWORD",
-                "ABD_BANK_NAME","ABD_BANK_LABEL","ABD_BANK_LAST4"):
+                "ABD_BANK_NAME","ABD_BANK_LABEL","ABD_BANK_LAST4",
+                "ABD_OLLAMA_URL","ABD_OLLAMA_MODEL"):
         os.environ[key]=old.get(key,"")
     return old
 
@@ -102,13 +125,16 @@ def page(settings,status):
     escape=lambda v:html.escape(str(v or ""),quote=True)
     status_text={
         "saved":"Gmail connection settings saved.",
-        "connected":"Gmail login successful.",
+        "connected":"Gmail login successful. Use Sync Gmail now to import tickets.",
+        "sync-failed":"Gmail import failed. Check the account, app password, and phone internet connection.",
         "failed":"Gmail login could not be verified.",
         "bank-saved":"Bank information saved.",
         "bank-failed":"Bank information could not be saved. Check the bank name and last four digits.",
         "plaid-saved":"Bank connection provider is configured.",
         "plaid-failed":"Bank connection needs valid provider credentials. You can still use the money ledger.",
     }.get(status,"")
+    if status.startswith("imported-") and status[9:].isdigit():
+        status_text = "Gmail sync finished. New tickets imported: " + status[9:]
     gmail_saved=bool(settings.get("ABD_IMAP_APP_PASSWORD"))
     bank_saved=bool(settings.get("ABD_BANK_NAME") or settings.get("ABD_BANK_LABEL"))
     gmail_label=("Gmail configured" if gmail_saved else "Add Gmail connection")
@@ -148,7 +174,15 @@ border-radius:9px;color:white;font-weight:700;list-style:none;display:inline-blo
 <p class="hint">Use a Google app password, not the normal Gmail password. <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">Google app passwords</a></p>
 <button type="submit">Save Gmail connection</button></form>
 <form method="post" action="/settings/test-gmail"><button type="submit">Test Gmail connection</button></form>
+<form method="post" action="/settings/sync-gmail"><button type="submit">Sync Gmail now</button></form>
 </details></section>
+<section><h2>Diagnostic AI</h2>
+<p class="muted">Offline diagnostics work on this phone. Optional: connect to an Ollama model on another device for generated AI estimates.</p>
+<form method="post" action="/settings/save">
+<label>Ollama API URL<input name="ABD_OLLAMA_URL" type="url" placeholder="http://192.168.1.10:11434/api/generate" value=\\"""+escape(settings.get("ABD_OLLAMA_URL",""))+"""\\"></label>
+<label>Model<input name="ABD_OLLAMA_MODEL" value=\\"""+escape(settings.get("ABD_OLLAMA_MODEL","qwen3:4b"))+"""\\"></label>
+<button type="submit">Save AI connection</button></form>
+</section>
 <section><h2>Bank account</h2>
 <p class="muted">Keep the business bank's identifying details with the office settings.</p>
 """+('<p><strong>'+bank_display+'</strong></p>' if bank_saved else "")+"""
