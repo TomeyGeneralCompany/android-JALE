@@ -29,24 +29,6 @@ void set_tokens(llama_batch_ext * batch, const llama_token * tokens, int n, int 
     llama_batch_ext_set_output_logits(batch, n - 1, true);
 }
 
-// The estimate contract is one JSON object. Stop as soon as the object is
-// complete, rather than spending CPU time on unnecessary trailing text.
-bool complete_json_object(const std::string & output) {
-    bool quoted = false;
-    bool escaped = false;
-    bool opened = false;
-    int depth = 0;
-    for (char ch : output) {
-        if (escaped) { escaped = false; continue; }
-        if (quoted && ch == '\\') { escaped = true; continue; }
-        if (ch == '"') { quoted = !quoted; continue; }
-        if (quoted) continue;
-        if (ch == '{') { opened = true; ++depth; }
-        if (ch == '}' && opened && --depth == 0) return true;
-    }
-    return false;
-}
-
 std::string generate(const std::string & model_path, const std::string & prompt, int max_new) {
     if (model_path.empty() || prompt.empty()) throw std::runtime_error("Model and prompt required");
     if (max_new < 1 || max_new > 1024) throw std::runtime_error("Invalid output token limit");
@@ -107,7 +89,6 @@ std::string generate(const std::string & model_path, const std::string & prompt,
             int size = llama_token_to_piece(vocab, next, piece, sizeof(piece), 0, true);
             if (size < 0 || size >= int(sizeof(piece))) throw std::runtime_error("Qwen token decoding failed");
             output.append(piece, size);
-            if (complete_json_object(output)) break;
             if (output.size() > 16000) break;
             set_tokens(batch, &next, 1, position);
             current_batch_size = 1;
