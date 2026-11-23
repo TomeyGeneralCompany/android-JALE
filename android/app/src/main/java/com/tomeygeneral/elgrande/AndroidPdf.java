@@ -36,7 +36,11 @@ public final class AndroidPdf {
             lines.add("COMPLETED WORK");
             lines.add(service);
             lines.add(issue);
-            lines.add(work);
+            if ("Monthly service agreement".equals(service)) {
+                java.util.Collections.addAll(lines, work.split("\\R"));
+            } else {
+                lines.add(work);
+            }
             lines.add("");
             lines.add("TOTAL INVOICE: $" + total);
             lines.add("Agreed customer price. No separate tax is added.");

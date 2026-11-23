@@ -59,6 +59,7 @@ def start(home, token):
     os.environ["ABD_BIND"] = "127.0.0.1"
     os.environ["ABD_PORT"] = "8765"
     os.environ.pop("ABD_DASHBOARD_PASSWORD", None)
+    os.environ.pop("ABD_PUBLIC_ORIGIN", None)
 
     # Android recreates the Python process on each cold launch. Restore
     # Gmail/AI settings saved inside the private app data directory.

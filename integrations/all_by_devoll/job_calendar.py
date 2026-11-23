@@ -95,8 +95,9 @@ def render(con, requested_month="", edit_ticket=""):
     first = parse_month(requested_month, current)
     last = first.replace(day=calendar.monthrange(first.year, first.month)[1])
     current_month = first.isoformat()[:7]
-    jobs = con.execute("SELECT id, customer, service FROM tickets WHERE " + ACTIVE + " ORDER BY id DESC").fetchall()
-    month_jobs = con.execute("""SELECT a.*, t.customer, t.service, t.status, t.finalized_at
+    jobs = con.execute("SELECT id, customer, service FROM tickets WHERE " + ACTIVE +
+        " AND source_id NOT LIKE 'office:%' ORDER BY id DESC").fetchall()
+    month_jobs = con.execute("""SELECT a.*, t.customer, t.service, t.status, t.finalized_at, t.source_id
         FROM job_appointments AS a JOIN tickets AS t ON t.id = a.ticket_id
         WHERE a.appointment_date BETWEEN ? AND ?
         ORDER BY a.appointment_date, a.appointment_time, a.ticket_id""",
@@ -149,14 +150,16 @@ def render(con, requested_month="", edit_ticket=""):
         status = ""
         if row["finalized_at"] or row["status"] == "cancelled":
             status = " · " + ("Cancelled" if row["status"] == "cancelled" else "Completed")
+        remove = ""
+        if not row["source_id"].startswith("office:"):
+            remove = ('<form method="post" action="/appointments/remove">'
+                      f'<input type="hidden" name="ticket_id" value="{ticket_id}">'
+                      f'<input type="hidden" name="calendar" value="{current_month}">'
+                      '<button class="action secondary" type="submit">Remove appointment</button></form>')
         agenda.append(
             f'<li{anchor}><div class="calendar-entry"><strong>{day:%a, %b} {day.day} · {clock}</strong>'
             f'<span>ABD-{ticket_id:06d} · {label}{status}</span>{edit}'
-            '<form method="post" action="/appointments/remove">'
-            f'<input type="hidden" name="ticket_id" value="{ticket_id}">'
-            f'<input type="hidden" name="calendar" value="{current_month}">'
-            '<button class="action secondary" type="submit">Remove appointment</button>'
-            "</form></div></li>"
+            + remove + "</div></li>"
         )
 
     default_day = current if current.replace(day=1) == first else first
